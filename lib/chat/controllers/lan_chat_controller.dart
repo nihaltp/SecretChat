@@ -45,6 +45,11 @@ class LanChatController extends ChangeNotifier {
     return rooms;
   }
 
+  void setStatus(String value) {
+    status = value;
+    _notify();
+  }
+
   Future<void> startDiscovery() async {
     await _closeDiscovery();
 

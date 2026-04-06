@@ -1,6 +1,8 @@
 import 'dart:math';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 import '../chat/controllers/lan_chat_controller.dart';
 import '../chat/models/chat_message.dart';
@@ -19,6 +21,7 @@ class ChatHomePage extends StatefulWidget {
 
 class _ChatHomePageState extends State<ChatHomePage> {
   final LanChatController controller = LanChatController();
+  final Connectivity _connectivity = Connectivity();
   final TextEditingController nameController = TextEditingController(
     text: 'User${Random().nextInt(900) + 100}',
   );
@@ -26,21 +29,122 @@ class _ChatHomePageState extends State<ChatHomePage> {
     text: 'My Room',
   );
   final TextEditingController messageController = TextEditingController();
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
+  bool _isWifiConnected = false;
+  bool _isHotspotHostMode = false;
+
+  bool get _canAccessRooms => _isWifiConnected || _isHotspotHostMode;
 
   @override
   void initState() {
     super.initState();
-    controller.startDiscovery();
-    controller.status = 'Ready';
+    _initConnectivity();
+    controller.setStatus(
+      'Pick "Host Network" or connect to Wi-Fi to access rooms.',
+    );
   }
 
   @override
   void dispose() {
+    _connectivitySubscription?.cancel();
     controller.dispose();
     nameController.dispose();
     roomController.dispose();
     messageController.dispose();
     super.dispose();
+  }
+
+  Future<void> _initConnectivity() async {
+    final List<ConnectivityResult> results = await _connectivity
+        .checkConnectivity();
+    _applyConnectivity(results);
+
+    _connectivitySubscription = _connectivity.onConnectivityChanged.listen(
+      _applyConnectivity,
+    );
+  }
+
+  void _applyConnectivity(List<ConnectivityResult> results) {
+    final bool wifiNow =
+        results.contains(ConnectivityResult.wifi) ||
+        results.contains(ConnectivityResult.ethernet);
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isWifiConnected = wifiNow;
+    });
+
+    if (_isWifiConnected) {
+      controller.startDiscovery();
+      if (!_isHotspotHostMode) {
+        controller.setStatus(
+          'Connected to local network. You can create/join rooms.',
+        );
+      }
+    } else if (!_isHotspotHostMode) {
+      controller.setStatus(
+        'Not connected to Wi-Fi. Turn on hotspot host mode or connect to Wi-Fi.',
+      );
+    }
+  }
+
+  Future<void> _enableHotspotHostMode() async {
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Host Network'),
+          content: const Text(
+            'Turn on your phone hotspot from system settings.\n\n'
+            'Then tap Continue and create a room. Other users must connect to your hotspot first.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Continue'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) {
+      return;
+    }
+
+    setState(() {
+      _isHotspotHostMode = true;
+    });
+    controller.setStatus(
+      'Hotspot host mode enabled. Turn hotspot on, then create a room.',
+    );
+    await controller.startDiscovery();
+  }
+
+  Future<void> _useExistingWifiMode() async {
+    setState(() {
+      _isHotspotHostMode = false;
+    });
+    final List<ConnectivityResult> results = await _connectivity
+        .checkConnectivity();
+    _applyConnectivity(results);
+  }
+
+  void _showNetworkRequiredMessage() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Connect to Wi-Fi or enable Host Network mode before creating/joining rooms.',
+        ),
+      ),
+    );
   }
 
   @override
@@ -91,6 +195,52 @@ class _ChatHomePageState extends State<ChatHomePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Text('Network Setup', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: _enableHotspotHostMode,
+                  icon: const Icon(Icons.wifi_tethering),
+                  label: const Text('Host Network'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _useExistingWifiMode,
+                  icon: const Icon(Icons.wifi),
+                  label: const Text('Use Wi-Fi'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              Chip(
+                label: Text(
+                  _isWifiConnected ? 'Wi-Fi Connected' : 'Wi-Fi Not Connected',
+                ),
+              ),
+              Chip(
+                label: Text(
+                  _isHotspotHostMode
+                      ? 'Hotspot Host Mode: On'
+                      : 'Hotspot Host Mode: Off',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Create or Join Rooms',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 8),
           TextField(
             controller: nameController,
             decoration: const InputDecoration(
@@ -111,14 +261,16 @@ class _ChatHomePageState extends State<ChatHomePage> {
             children: [
               Expanded(
                 child: FilledButton.icon(
-                  onPressed: () async {
-                    final String name = nameController.text.trim();
-                    final String room = roomController.text.trim();
-                    if (name.isEmpty || room.isEmpty) {
-                      return;
-                    }
-                    await controller.hostRoom(yourName: name, room: room);
-                  },
+                  onPressed: _canAccessRooms
+                      ? () async {
+                          final String name = nameController.text.trim();
+                          final String room = roomController.text.trim();
+                          if (name.isEmpty || room.isEmpty) {
+                            return;
+                          }
+                          await controller.hostRoom(yourName: name, room: room);
+                        }
+                      : _showNetworkRequiredMessage,
                   icon: const Icon(Icons.wifi_tethering),
                   label: const Text('Host Room'),
                 ),
@@ -126,7 +278,9 @@ class _ChatHomePageState extends State<ChatHomePage> {
               const SizedBox(width: 8),
               IconButton(
                 tooltip: 'Refresh',
-                onPressed: controller.startDiscovery,
+                onPressed: _canAccessRooms
+                    ? controller.startDiscovery
+                    : _showNetworkRequiredMessage,
                 icon: const Icon(Icons.refresh),
               ),
             ],
@@ -153,16 +307,19 @@ class _ChatHomePageState extends State<ChatHomePage> {
                             '${room.hostName} • ${room.hostAddress.address}:${room.port}',
                           ),
                           trailing: FilledButton(
-                            onPressed: () async {
-                              final String name = nameController.text.trim();
-                              if (name.isEmpty) {
-                                return;
-                              }
-                              await controller.joinRoom(
-                                room: room,
-                                yourName: name,
-                              );
-                            },
+                            onPressed: _canAccessRooms
+                                ? () async {
+                                    final String name = nameController.text
+                                        .trim();
+                                    if (name.isEmpty) {
+                                      return;
+                                    }
+                                    await controller.joinRoom(
+                                      room: room,
+                                      yourName: name,
+                                    );
+                                  }
+                                : _showNetworkRequiredMessage,
                             child: const Text('Join'),
                           ),
                         ),
