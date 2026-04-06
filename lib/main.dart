@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'screens/app_flow_screen.dart';
+import 'security/app_lock_controller.dart';
 import 'settings/theme_controller.dart';
 
 void main() {
@@ -16,9 +17,11 @@ class SecretChatApp extends StatefulWidget {
 
 class _SecretChatAppState extends State<SecretChatApp> {
   final ThemeController _themeController = ThemeController();
+  final AppLockController _appLockController = AppLockController();
 
   @override
   void dispose() {
+    _appLockController.dispose();
     _themeController.dispose();
     super.dispose();
   }
@@ -45,7 +48,10 @@ class _SecretChatAppState extends State<SecretChatApp> {
             ),
             useMaterial3: true,
           ),
-          home: AppFlowScreen(themeController: _themeController),
+          home: AppFlowScreen(
+            themeController: _themeController,
+            appLockController: _appLockController,
+          ),
         );
       },
     );

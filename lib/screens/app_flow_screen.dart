@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../chat/controllers/lan_chat_controller.dart';
 import '../chat/models/room_creation_data.dart';
 import '../chat/models/room_info.dart';
+import '../security/app_lock_controller.dart';
 import '../settings/theme_controller.dart';
 import 'chat_screen.dart';
 import 'create_room_screen.dart';
@@ -16,15 +17,21 @@ import 'settings_screen.dart';
 enum AppStage { home, rooms, chat }
 
 class AppFlowScreen extends StatefulWidget {
-  const AppFlowScreen({super.key, required this.themeController});
+  const AppFlowScreen({
+    super.key,
+    required this.themeController,
+    required this.appLockController,
+  });
 
   final ThemeController themeController;
+  final AppLockController appLockController;
 
   @override
   State<AppFlowScreen> createState() => _AppFlowScreenState();
 }
 
-class _AppFlowScreenState extends State<AppFlowScreen> {
+class _AppFlowScreenState extends State<AppFlowScreen>
+    with WidgetsBindingObserver {
   final LanChatController _controller = LanChatController();
   final Connectivity _connectivity = Connectivity();
 
@@ -33,21 +40,63 @@ class _AppFlowScreenState extends State<AppFlowScreen> {
   String _userName = '';
   bool _isWifiConnected = false;
   bool _isHostNetworkMode = false;
+  bool _lockOverlayVisible = false;
 
   bool get _canAccessRooms => _isWifiConnected || _isHostNetworkMode;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    widget.appLockController.addListener(_onAppLockChanged);
+    widget.appLockController.init().then((_) => _enforceAppLock());
     _initConnectivity();
     _controller.setStatus('Choose Host Network or Use Wi-Fi to continue.');
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    widget.appLockController.removeListener(_onAppLockChanged);
     _connectivitySubscription?.cancel();
     _controller.dispose();
     super.dispose();
+  }
+
+  void _onAppLockChanged() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      widget.appLockController.markLocked();
+      if (widget.appLockController.enabled && mounted) {
+        setState(() {
+          _lockOverlayVisible = true;
+        });
+      }
+      return;
+    }
+
+    if (state == AppLifecycleState.resumed) {
+      _enforceAppLock();
+    }
+  }
+
+  Future<void> _enforceAppLock() async {
+    final bool unlocked = await widget.appLockController.ensureUnlocked(
+      reason: 'Unlock Secret Chat',
+    );
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _lockOverlayVisible = !unlocked;
+    });
   }
 
   Future<void> _initConnectivity() async {
@@ -90,7 +139,10 @@ class _AppFlowScreenState extends State<AppFlowScreen> {
   void _openSettings() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => SettingsScreen(themeController: widget.themeController),
+        builder: (_) => SettingsScreen(
+          themeController: widget.themeController,
+          appLockController: widget.appLockController,
+        ),
       ),
     );
   }
@@ -215,20 +267,6 @@ class _AppFlowScreenState extends State<AppFlowScreen> {
     }
   }
 
-  Future<void> _joinByName(String roomName, String? securityValue) async {
-    final RoomInfo? room = _controller.findRoomByName(
-      roomName,
-      includeHidden: true,
-    );
-
-    if (room == null) {
-      _showSnack('Room not found. Check name and try again.');
-      return;
-    }
-
-    await _joinRoom(room, securityValue);
-  }
-
   Future<void> _leaveChat() async {
     await _controller.disconnect();
     if (!mounted) {
@@ -250,15 +288,17 @@ class _AppFlowScreenState extends State<AppFlowScreen> {
     return AnimatedBuilder(
       animation: _controller,
       builder: (BuildContext context, _) {
+        Widget screen;
         switch (_stage) {
           case AppStage.home:
-            return HomeScreen(
+            screen = HomeScreen(
               onHostPressed: _onHostNetworkSelected,
               onWifiPressed: _onUseWifiSelected,
               onOpenSettings: _openSettings,
             );
+            break;
           case AppStage.rooms:
-            return RoomsScreen(
+            screen = RoomsScreen(
               rooms: _controller.visibleRooms,
               userName: _userName,
               isHostNetworkMode: _isHostNetworkMode,
@@ -272,16 +312,71 @@ class _AppFlowScreenState extends State<AppFlowScreen> {
               onOpenSettings: _openSettings,
               onRefresh: _controller.startDiscovery,
               onCreateRoom: _createRoom,
+              onFindRoomByName: (String name) =>
+                  _controller.findRoomByName(name, includeHidden: true),
               onJoinRoom: _joinRoom,
-              onJoinByName: _joinByName,
             );
+            break;
           case AppStage.chat:
-            return ChatScreen(
+            screen = ChatScreen(
               controller: _controller,
               onLeave: _leaveChat,
               onOpenSettings: _openSettings,
             );
+            break;
         }
+
+        final bool lockVisible =
+            _lockOverlayVisible || widget.appLockController.isLocked;
+        if (!lockVisible) {
+          return screen;
+        }
+
+        return Stack(
+          children: [
+            screen,
+            Positioned.fill(
+              child: ColoredBox(
+                color: Theme.of(
+                  context,
+                ).colorScheme.surface.withValues(alpha: 0.96),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 320),
+                    child: Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.lock, size: 40),
+                            const SizedBox(height: 10),
+                            const Text(
+                              'App is locked',
+                              style: TextStyle(fontSize: 18),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'Use biometric authentication or your screen lock to continue.',
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 14),
+                            FilledButton.icon(
+                              key: const Key('unlock_app_button'),
+                              onPressed: _enforceAppLock,
+                              icon: const Icon(Icons.fingerprint),
+                              label: const Text('Unlock'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
       },
     );
   }

@@ -39,10 +39,10 @@ void main() {
           onCreateRoom: () {
             createTapped = true;
           },
+          onFindRoomByName: (String roomName) => room,
           onJoinRoom: (RoomInfo roomArg, String? securityArg) async {
             joinTapped = true;
           },
-          onJoinByName: (String roomNameArg, String? securityArg) async {},
         ),
       ),
     );
@@ -76,8 +76,8 @@ void main() {
           onOpenSettings: () {},
           onRefresh: () {},
           onCreateRoom: () {},
+          onFindRoomByName: (String roomName) => null,
           onJoinRoom: (RoomInfo roomArg, String? securityArg) async {},
-          onJoinByName: (String roomNameArg, String? securityArg) async {},
         ),
       ),
     );

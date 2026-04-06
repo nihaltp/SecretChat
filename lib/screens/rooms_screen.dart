@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../chat/models/room_info.dart';
+import 'pattern_lock_screen.dart';
 
 class RoomsScreen extends StatefulWidget {
   const RoomsScreen({
@@ -14,8 +15,8 @@ class RoomsScreen extends StatefulWidget {
     required this.onOpenSettings,
     required this.onRefresh,
     required this.onCreateRoom,
+    required this.onFindRoomByName,
     required this.onJoinRoom,
-    required this.onJoinByName,
   });
 
   final List<RoomInfo> rooms;
@@ -28,9 +29,8 @@ class RoomsScreen extends StatefulWidget {
   final VoidCallback onOpenSettings;
   final VoidCallback onRefresh;
   final VoidCallback onCreateRoom;
+  final RoomInfo? Function(String roomName) onFindRoomByName;
   final Future<void> Function(RoomInfo room, String? securityValue) onJoinRoom;
-  final Future<void> Function(String roomName, String? securityValue)
-  onJoinByName;
 
   @override
   State<RoomsScreen> createState() => _RoomsScreenState();
@@ -58,11 +58,23 @@ class _RoomsScreenState extends State<RoomsScreen> {
   Future<void> _joinRoom(RoomInfo room) async {
     String? securityValue;
     if (room.requiresSecurity) {
-      securityValue = await _askSecurityValue(
-        title: 'Room Security',
-        message:
-            'Enter ${roomSecurityTypeToWire(room.securityType)} for ${room.roomName}',
-      );
+      if (room.securityType == RoomSecurityType.pattern) {
+        securityValue = await Navigator.of(context).push<String>(
+          MaterialPageRoute<String>(
+            builder: (_) => PatternLockScreen.verify(
+              existingPattern: room.securityValue,
+              title: 'Draw Pattern for ${room.roomName}',
+            ),
+          ),
+        );
+      } else {
+        securityValue = await _askSecurityValue(
+          title: 'Room Security',
+          message:
+              'Enter ${roomSecurityTypeToWire(room.securityType)} for ${room.roomName}',
+        );
+      }
+
       if (securityValue == null) {
         return;
       }
@@ -108,38 +120,23 @@ class _RoomsScreenState extends State<RoomsScreen> {
         );
       },
     );
-    securityController.dispose();
     return result;
   }
 
   Future<void> _joinByRoomName() async {
     final TextEditingController roomController = TextEditingController();
-    final TextEditingController securityController = TextEditingController();
 
-    final Map<String, String>? result = await showDialog<Map<String, String>>(
+    final String? roomName = await showDialog<String>(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text('Join by Room Name'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: roomController,
-                decoration: const InputDecoration(
-                  labelText: 'Room name',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: securityController,
-                decoration: const InputDecoration(
-                  labelText: 'Password / PIN / Pattern (if needed)',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-            ],
+          content: TextField(
+            controller: roomController,
+            decoration: const InputDecoration(
+              labelText: 'Room name',
+              border: OutlineInputBorder(),
+            ),
           ),
           actions: [
             TextButton(
@@ -147,31 +144,31 @@ class _RoomsScreenState extends State<RoomsScreen> {
               child: const Text('Cancel'),
             ),
             FilledButton(
-              onPressed: () => Navigator.of(context).pop(<String, String>{
-                'room': roomController.text.trim(),
-                'security': securityController.text.trim(),
-              }),
-              child: const Text('Join'),
+              onPressed: () =>
+                  Navigator.of(context).pop(roomController.text.trim()),
+              child: const Text('Continue'),
             ),
           ],
         );
       },
     );
 
-    roomController.dispose();
-    securityController.dispose();
-
-    if (result == null) {
+    if (roomName == null || roomName.isEmpty) {
       return;
     }
 
-    final String roomName = result['room'] ?? '';
-    final String security = result['security'] ?? '';
-    if (roomName.isEmpty) {
+    final RoomInfo? room = widget.onFindRoomByName(roomName);
+    if (room == null) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Room does not exist.')));
       return;
     }
 
-    await widget.onJoinByName(roomName, security.isEmpty ? null : security);
+    await _joinRoom(room);
   }
 
   @override

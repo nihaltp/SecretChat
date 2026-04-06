@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../chat/models/room_creation_data.dart';
 import '../chat/models/room_info.dart';
+import 'pattern_lock_screen.dart';
 
 class CreateRoomScreen extends StatefulWidget {
   const CreateRoomScreen({super.key});
@@ -16,6 +17,7 @@ class _CreateRoomScreenState extends State<CreateRoomScreen> {
 
   bool _hidden = false;
   RoomSecurityType _securityType = RoomSecurityType.none;
+  String? _patternValue;
 
   @override
   void dispose() {
@@ -48,9 +50,19 @@ class _CreateRoomScreenState extends State<CreateRoomScreen> {
       return;
     }
 
-    if (_securityType != RoomSecurityType.none && securityValue.isEmpty) {
+    if (_securityType != RoomSecurityType.none &&
+        _securityType != RoomSecurityType.pattern &&
+        securityValue.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Enter security value for this room.')),
+      );
+      return;
+    }
+
+    if (_securityType == RoomSecurityType.pattern &&
+        (_patternValue == null || _patternValue!.isEmpty)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Set a pattern before creating room.')),
       );
       return;
     }
@@ -62,9 +74,27 @@ class _CreateRoomScreenState extends State<CreateRoomScreen> {
         securityType: _securityType,
         securityValue: _securityType == RoomSecurityType.none
             ? null
+            : _securityType == RoomSecurityType.pattern
+            ? _patternValue
             : securityValue,
       ),
     );
+  }
+
+  Future<void> _setupPattern() async {
+    final String? pattern = await Navigator.of(context).push<String>(
+      MaterialPageRoute<String>(
+        builder: (_) => const PatternLockScreen.setup(),
+      ),
+    );
+
+    if (pattern == null || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _patternValue = pattern;
+    });
   }
 
   @override
@@ -124,6 +154,7 @@ class _CreateRoomScreenState extends State<CreateRoomScreen> {
                   _securityType = value ?? RoomSecurityType.none;
                   if (_securityType == RoomSecurityType.none) {
                     _securityController.clear();
+                    _patternValue = null;
                   }
                 });
               },
@@ -134,18 +165,39 @@ class _CreateRoomScreenState extends State<CreateRoomScreen> {
             ),
             if (_securityType != RoomSecurityType.none) ...[
               const SizedBox(height: 12),
-              TextField(
-                key: const Key('security_value_field'),
-                controller: _securityController,
-                obscureText: _securityType == RoomSecurityType.password,
-                keyboardType: _securityType == RoomSecurityType.pin
-                    ? TextInputType.number
-                    : TextInputType.text,
-                decoration: InputDecoration(
-                  labelText: _securityLabel,
-                  border: const OutlineInputBorder(),
+              if (_securityType == RoomSecurityType.pattern)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    FilledButton.tonalIcon(
+                      key: const Key('setup_pattern_button'),
+                      onPressed: _setupPattern,
+                      icon: const Icon(Icons.pattern),
+                      label: Text(
+                        _patternValue == null ? 'Set Pattern' : 'Reset Pattern',
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      _patternValue == null
+                          ? 'No pattern set'
+                          : 'Pattern is set',
+                    ),
+                  ],
+                )
+              else
+                TextField(
+                  key: const Key('security_value_field'),
+                  controller: _securityController,
+                  obscureText: _securityType == RoomSecurityType.password,
+                  keyboardType: _securityType == RoomSecurityType.pin
+                      ? TextInputType.number
+                      : TextInputType.text,
+                  decoration: InputDecoration(
+                    labelText: _securityLabel,
+                    border: const OutlineInputBorder(),
+                  ),
                 ),
-              ),
             ],
             const SizedBox(height: 16),
             FilledButton.icon(
