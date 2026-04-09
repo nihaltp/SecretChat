@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../security/app_lock_controller.dart';
 import '../settings/theme_controller.dart';
+import '../widgets/app_logo_title.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({
@@ -22,7 +23,7 @@ class SettingsScreen extends StatelessWidget {
           animation: appLockController,
           builder: (BuildContext context, _) {
             return Scaffold(
-              appBar: AppBar(title: const Text('Settings')),
+              appBar: AppBar(title: const AppLogoTitle('Settings')),
               body: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [

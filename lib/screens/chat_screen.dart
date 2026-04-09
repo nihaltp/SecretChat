@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../chat/controllers/lan_chat_controller.dart';
 import '../chat/models/chat_message.dart';
+import '../widgets/app_logo_title.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({
@@ -41,7 +42,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(controller.roomName ?? 'Room Chat'),
+        title: AppLogoTitle(controller.roomName ?? 'Room Chat'),
         actions: [
           IconButton(
             tooltip: 'Settings',

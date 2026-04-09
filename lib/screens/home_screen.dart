@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../widgets/app_logo_title.dart';
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
     super.key,
@@ -46,7 +48,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Secret Chat'),
+        title: const AppLogoTitle('Secret Chat'),
         actions: [
           IconButton(
             tooltip: 'Settings',

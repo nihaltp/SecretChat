@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../chat/models/room_creation_data.dart';
 import '../chat/models/room_info.dart';
+import '../widgets/app_logo_title.dart';
 import 'pattern_lock_screen.dart';
 
 class CreateRoomScreen extends StatefulWidget {
@@ -100,7 +101,7 @@ class _CreateRoomScreenState extends State<CreateRoomScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Create Room')),
+      appBar: AppBar(title: const AppLogoTitle('Create Room')),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: ListView(

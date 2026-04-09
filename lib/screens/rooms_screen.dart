@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../chat/models/room_info.dart';
+import '../widgets/app_logo_title.dart';
 import 'pattern_lock_screen.dart';
 
 class RoomsScreen extends StatefulWidget {
@@ -176,7 +177,7 @@ class _RoomsScreenState extends State<RoomsScreen> {
     final List<RoomInfo> rooms = _filteredRooms;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Rooms'),
+        title: const AppLogoTitle('Rooms'),
         leading: IconButton(
           tooltip: 'Back',
           onPressed: widget.onBack,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../widgets/app_logo_title.dart';
 import '../widgets/pattern_lock_board.dart';
 
 enum PatternLockMode { setup, verify }
@@ -69,7 +70,7 @@ class _PatternLockScreenState extends State<PatternLockScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(widget.title)),
+      appBar: AppBar(title: AppLogoTitle(widget.title)),
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
