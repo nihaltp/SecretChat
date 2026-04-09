@@ -267,6 +267,24 @@ class _AppFlowScreenState extends State<AppFlowScreen>
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  Future<void> _handleSystemBack() async {
+    switch (_stage) {
+      case AppStage.chat:
+        await _leaveChat();
+        break;
+      case AppStage.rooms:
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _stage = AppStage.home;
+        });
+        break;
+      case AppStage.home:
+        break;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -312,11 +330,11 @@ class _AppFlowScreenState extends State<AppFlowScreen>
 
         final bool lockVisible =
             _lockOverlayVisible || widget.appLockController.isLocked;
+        final Widget content;
         if (!lockVisible) {
-          return screen;
-        }
-
-        return Stack(
+          content = screen;
+        } else {
+          content = Stack(
           children: [
             screen,
             Positioned.fill(
@@ -360,6 +378,18 @@ class _AppFlowScreenState extends State<AppFlowScreen>
               ),
             ),
           ],
+          );
+        }
+
+        return PopScope<void>(
+          canPop: _stage == AppStage.home,
+          onPopInvokedWithResult: (bool didPop, void _) {
+            if (didPop) {
+              return;
+            }
+            _handleSystemBack();
+          },
+          child: content,
         );
       },
     );
