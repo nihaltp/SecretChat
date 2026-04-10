@@ -39,6 +39,7 @@ class RoomInfo {
     required this.port,
     required this.lastSeen,
     this.hidden = false,
+    this.historyEnabled = false,
     this.securityType = RoomSecurityType.none,
     this.securityValue,
   });
@@ -49,6 +50,7 @@ class RoomInfo {
   final int port;
   DateTime lastSeen;
   final bool hidden;
+  final bool historyEnabled;
   final RoomSecurityType securityType;
   final String? securityValue;
 

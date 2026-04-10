@@ -1,3 +1,11 @@
+v1.1.0 - Room History and Failover
+• Optional chat history per room (default off)
+• Sender-owned history sync on rejoin
+• Join/leave notices auto-hide after 5 seconds
+• Message access restricted to user presence windows
+• Host failover on Wi-Fi (highest battery device)
+• Leaving user messages are purged from all devices
+
 v1.0.0 - Release
 • Initial release of Secret Chat
 • LAN messaging without internet connection

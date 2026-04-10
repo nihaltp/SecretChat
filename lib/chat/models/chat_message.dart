@@ -8,6 +8,7 @@ class ChatMessage {
     required this.senderName,
     required this.text,
     required this.timestamp,
+    this.sequence,
     this.system = false,
   });
 
@@ -16,5 +17,6 @@ class ChatMessage {
   final String senderName;
   final String text;
   final DateTime timestamp;
+  final int? sequence;
   final bool system;
 }

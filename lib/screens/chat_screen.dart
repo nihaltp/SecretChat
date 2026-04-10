@@ -25,9 +25,28 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) {
+      return;
+    }
+
+    final ScrollPosition position = _scrollController.position;
+    if (position.pixels >= position.maxScrollExtent - 120) {
+      widget.controller.loadOlderMessages();
+    }
+  }
 
   @override
   void dispose() {
+    _scrollController.dispose();
     _messageController.dispose();
     super.dispose();
   }
@@ -84,10 +103,38 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           Expanded(
             child: ListView.builder(
+              controller: _scrollController,
               reverse: true,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              itemCount: controller.messages.length,
+              itemCount: controller.messages.length +
+                  ((controller.historyEnabled &&
+                              controller.mode == ChatMode.connected &&
+                              (controller.hasMoreHistory ||
+                                  controller.historyLoading))
+                          ? 1
+                          : 0),
               itemBuilder: (BuildContext context, int i) {
+                final bool hasHistoryIndicator =
+                    controller.historyEnabled &&
+                    controller.mode == ChatMode.connected &&
+                    (controller.hasMoreHistory || controller.historyLoading);
+                if (hasHistoryIndicator && i == controller.messages.length) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Center(
+                      child: controller.historyLoading
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Text(
+                              'Scroll up to load older messages',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                    ),
+                  );
+                }
                 final ChatMessage msg =
                     controller.messages[controller.messages.length - 1 - i];
                 final bool mine = msg.senderId == controller.localUserId;

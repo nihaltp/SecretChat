@@ -7,12 +7,14 @@ class RoomCreationData {
   RoomCreationData({
     required this.roomName,
     required this.hidden,
+    required this.historyEnabled,
     required this.securityType,
     this.securityValue,
   });
 
   final String roomName;
   final bool hidden;
+  final bool historyEnabled;
   final RoomSecurityType securityType;
   final String? securityValue;
 }

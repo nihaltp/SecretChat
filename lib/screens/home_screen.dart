@@ -67,7 +67,7 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.all(16),
               child: ConstrainedBox(
                 constraints: BoxConstraints(
-                  minHeight: constraints.maxHeight - 32,
+                  minHeight: (constraints.maxHeight - 32).clamp(0, double.infinity),
                 ),
                 child: Center(
                   child: ConstrainedBox(

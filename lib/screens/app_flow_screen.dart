@@ -212,6 +212,7 @@ class _AppFlowScreenState extends State<AppFlowScreen>
       yourName: _userName,
       room: data.roomName,
       hidden: data.hidden,
+      historyEnabled: data.historyEnabled,
       securityType: data.securityType,
       securityValue: data.securityValue,
     );

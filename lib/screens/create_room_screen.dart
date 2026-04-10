@@ -20,6 +20,7 @@ class _CreateRoomScreenState extends State<CreateRoomScreen> {
   final TextEditingController _securityController = TextEditingController();
 
   bool _hidden = false;
+  bool _historyEnabled = false;
   RoomSecurityType _securityType = RoomSecurityType.none;
   String? _patternValue;
 
@@ -75,6 +76,7 @@ class _CreateRoomScreenState extends State<CreateRoomScreen> {
       RoomCreationData(
         roomName: roomName,
         hidden: _hidden,
+        historyEnabled: _historyEnabled,
         securityType: _securityType,
         securityValue: _securityType == RoomSecurityType.none
             ? null
@@ -129,6 +131,20 @@ class _CreateRoomScreenState extends State<CreateRoomScreen> {
               title: const Text('Hide room from list'),
               subtitle: const Text(
                 'Hidden rooms are not listed. Users can join by room name and security value.',
+              ),
+            ),
+            const SizedBox(height: 12),
+            SwitchListTile(
+              key: const Key('history_enabled_switch'),
+              value: _historyEnabled,
+              onChanged: (bool value) {
+                setState(() {
+                  _historyEnabled = value;
+                });
+              },
+              title: const Text('Enable chat history'),
+              subtitle: const Text(
+                'When enabled, participants can reload recent room messages after rejoining.',
               ),
             ),
             const SizedBox(height: 12),
