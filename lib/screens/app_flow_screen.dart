@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Secret Chat Contributors
+
 import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
