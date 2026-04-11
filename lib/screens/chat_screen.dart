@@ -11,6 +11,7 @@ class ChatScreen extends StatefulWidget {
   const ChatScreen({
     super.key,
     required this.controller,
+    this.title,
     required this.listenOnLeave,
     required this.onListenOnLeaveChanged,
     required this.onLeave,
@@ -18,6 +19,7 @@ class ChatScreen extends StatefulWidget {
   });
 
   final LanChatController controller;
+  final String? title;
   final bool listenOnLeave;
   final ValueChanged<bool> onListenOnLeaveChanged;
   final VoidCallback onLeave;
@@ -30,6 +32,40 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+
+  Future<void> _showParticipantsSheet() async {
+    final LanChatController controller = widget.controller;
+    final String localName = controller.localUserName ?? '';
+
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+            children: [
+              Text(
+                'Participants',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 8),
+              for (final String name in controller.participants)
+                ListTile(
+                  leading: CircleAvatar(
+                    child: Text(
+                      name.isEmpty ? '?' : name.characters.first.toUpperCase(),
+                    ),
+                  ),
+                  title: Text(name),
+                  subtitle: Text(name == localName ? 'You' : 'Participant'),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
   @override
   void initState() {
@@ -68,7 +104,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: AppLogoTitle(controller.roomName ?? 'Room Chat'),
+        title: AppLogoTitle(widget.title ?? controller.roomName ?? 'Room Chat'),
         actions: [
           IconButton(
             tooltip: 'Settings',
@@ -109,8 +145,14 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                     label: Text(isHost ? 'You are host' : 'You joined'),
                   ),
-                  for (final String name in controller.participants)
-                    Chip(label: Text(name)),
+                  ActionChip(
+                    key: const Key('participants_count_chip'),
+                    avatar: const Icon(Icons.groups, size: 18),
+                    label: Text(
+                      '${controller.participants.length} participants',
+                    ),
+                    onPressed: _showParticipantsSheet,
+                  ),
                 ],
               ),
             ),

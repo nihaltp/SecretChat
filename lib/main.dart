@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'screens/app_flow_screen.dart';
 import 'security/app_lock_controller.dart';
 import 'settings/default_room_listening_controller.dart';
+import 'settings/network_privacy_controller.dart';
 import 'settings/theme_controller.dart';
 
 void main() {
@@ -24,10 +25,19 @@ class _SecretChatAppState extends State<SecretChatApp> {
   final AppLockController _appLockController = AppLockController();
   final DefaultRoomListeningController _defaultRoomListeningController =
       DefaultRoomListeningController();
+  final NetworkPrivacyController _networkPrivacyController =
+      NetworkPrivacyController();
+
+  @override
+  void initState() {
+    super.initState();
+    _themeController.init();
+  }
 
   @override
   void dispose() {
     _defaultRoomListeningController.dispose();
+    _networkPrivacyController.dispose();
     _appLockController.dispose();
     _themeController.dispose();
     super.dispose();
@@ -59,6 +69,7 @@ class _SecretChatAppState extends State<SecretChatApp> {
             themeController: _themeController,
             appLockController: _appLockController,
             defaultRoomListeningController: _defaultRoomListeningController,
+            networkPrivacyController: _networkPrivacyController,
           ),
         );
       },

@@ -11,11 +11,15 @@ class HomeScreen extends StatefulWidget {
     required this.onHostPressed,
     required this.onWifiPressed,
     required this.onOpenSettings,
+    this.initialDisplayName,
+    this.onDisplayNameChanged,
   });
 
   final ValueChanged<String> onHostPressed;
   final ValueChanged<String> onWifiPressed;
   final VoidCallback onOpenSettings;
+  final String? initialDisplayName;
+  final ValueChanged<String>? onDisplayNameChanged;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -27,11 +31,20 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _nameController.text = 'User${DateTime.now().millisecond % 900 + 100}';
+    final String seeded = widget.initialDisplayName?.trim() ?? '';
+    _nameController.text = seeded.isEmpty
+        ? 'User${DateTime.now().millisecond % 900 + 100}'
+        : seeded;
+    _nameController.addListener(_onNameChanged);
+  }
+
+  void _onNameChanged() {
+    widget.onDisplayNameChanged?.call(_nameController.text);
   }
 
   @override
   void dispose() {
+    _nameController.removeListener(_onNameChanged);
     _nameController.dispose();
     super.dispose();
   }
@@ -67,7 +80,10 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.all(16),
               child: ConstrainedBox(
                 constraints: BoxConstraints(
-                  minHeight: (constraints.maxHeight - 32).clamp(0, double.infinity),
+                  minHeight: (constraints.maxHeight - 32).clamp(
+                    0,
+                    double.infinity,
+                  ),
                 ),
                 child: Center(
                   child: ConstrainedBox(

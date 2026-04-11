@@ -12,7 +12,7 @@ class AppLogoTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      mainAxisSize: MainAxisSize.min,
+      mainAxisSize: MainAxisSize.max,
       children: [
         ClipRRect(
           borderRadius: BorderRadius.circular(6),
@@ -24,7 +24,9 @@ class AppLogoTitle extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 8),
-        Text(title),
+        Flexible(
+          child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+        ),
       ],
     );
   }

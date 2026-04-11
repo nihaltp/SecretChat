@@ -35,6 +35,7 @@ class RoomInfo {
   RoomInfo({
     required this.hostAddress,
     required this.hostName,
+    this.hostUserId = '',
     required this.roomName,
     required this.port,
     required this.lastSeen,
@@ -42,10 +43,13 @@ class RoomInfo {
     this.historyEnabled = false,
     this.securityType = RoomSecurityType.none,
     this.securityValue,
+    this.hostHiddenFromNetwork = false,
+    this.hostAllowsIdChat = true,
   });
 
   final InternetAddress hostAddress;
   final String hostName;
+  final String hostUserId;
   final String roomName;
   final int port;
   DateTime lastSeen;
@@ -53,6 +57,8 @@ class RoomInfo {
   final bool historyEnabled;
   final RoomSecurityType securityType;
   final String? securityValue;
+  final bool hostHiddenFromNetwork;
+  final bool hostAllowsIdChat;
 
   bool get requiresSecurity => securityType != RoomSecurityType.none;
 

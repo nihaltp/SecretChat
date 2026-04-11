@@ -82,56 +82,6 @@ extension on LanChatController {
     }
   }
 
-  /// Sends a page of history to a client during catch-up, respecting
-  /// the client's presence window to ensure they only see messages
-  /// they were present for.
-  void _sendHistoryPage(
-    _ClientPeer peer, {
-    required String requestId,
-    required int? beforeSequence,
-    required int limit,
-  }) {
-    final String effectiveUserId = peer.userId ?? peer.id;
-    final List<_PresenceWindow> windows =
-        _presenceWindowsByUser[effectiveUserId] ?? <_PresenceWindow>[];
-
-    if (!_hostHistoryEnabled || windows.isEmpty) {
-      _sendLine(peer.socket, <String, dynamic>{
-        'type': 'historyPage',
-        'requestId': requestId,
-        'messages': const <Map<String, dynamic>>[],
-        'hasMore': false,
-        'nextBeforeSequence': null,
-      });
-      return;
-    }
-
-    final int normalizedLimit = limit.clamp(1, 100);
-    final Iterable<_HistoryEntry> visible = _historyEntries.where(
-      (_HistoryEntry entry) => _canUserAccessMessage(entry.timestamp, windows),
-    );
-
-    final Iterable<_HistoryEntry> eligible = beforeSequence == null
-        ? visible
-        : visible.where((entry) => entry.sequence < beforeSequence);
-    final List<_HistoryEntry> eligibleList = eligible.toList();
-
-    final int startIndex = eligibleList.length > normalizedLimit
-        ? eligibleList.length - normalizedLimit
-        : 0;
-    final List<_HistoryEntry> page = eligibleList.sublist(startIndex);
-    final bool hasMore = startIndex > 0;
-    final int? nextBeforeSequence = hasMore ? page.first.sequence : null;
-
-    _sendLine(peer.socket, <String, dynamic>{
-      'type': 'historyPage',
-      'requestId': requestId,
-      'messages': page.map((entry) => entry.toPacket()).toList(),
-      'hasMore': hasMore,
-      'nextBeforeSequence': nextBeforeSequence,
-    });
-  }
-
   /// Applies a page of history received from the host to the local message store.
   void _applyHistoryPage(Map<String, dynamic> packet) {
     final String requestId = (packet['requestId'] ?? '').toString();
@@ -182,7 +132,9 @@ extension on LanChatController {
     _historyCursorBeforeSequence = nextBeforeSequence;
     _historyLoading = false;
 
-    final Completer<void>? completer = _pendingHistoryRequests.remove(requestId);
+    final Completer<void>? completer = _pendingHistoryRequests.remove(
+      requestId,
+    );
     if (completer != null && !completer.isCompleted) {
       completer.complete();
     }

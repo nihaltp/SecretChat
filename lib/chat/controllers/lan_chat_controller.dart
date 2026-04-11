@@ -28,10 +28,10 @@ class LanChatController extends ChangeNotifier {
     Future<String> Function()? localUserIdProvider,
     int? chatPortOverride,
     int? discoveryPortOverride,
-  })  : _batteryLevelProvider = batteryLevelProvider ?? _defaultBatteryLevel,
-        _localUserIdProvider = localUserIdProvider,
-        _chatPort = chatPortOverride ?? chatPort,
-        _discoveryPort = discoveryPortOverride ?? discoveryPort;
+  }) : _batteryLevelProvider = batteryLevelProvider ?? _defaultBatteryLevel,
+       _localUserIdProvider = localUserIdProvider,
+       _chatPort = chatPortOverride ?? roomChatPort,
+       _discoveryPort = discoveryPortOverride ?? roomDiscoveryPort;
 
   final List<ChatMessage> messages = <ChatMessage>[];
   final List<String> participants = <String>[];
@@ -42,7 +42,7 @@ class LanChatController extends ChangeNotifier {
   final Map<String, List<_PresenceWindow>> _presenceWindowsByUser =
       <String, List<_PresenceWindow>>{};
   final Map<String, _ParticipantState> _participantsById =
-    <String, _ParticipantState>{};
+      <String, _ParticipantState>{};
   final Map<String, Completer<void>> _pendingHistoryRequests =
       <String, Completer<void>>{};
   final Future<int> Function() _batteryLevelProvider;
@@ -75,17 +75,20 @@ class LanChatController extends ChangeNotifier {
   final Map<String, Timer> _ephemeralMessageTimers = <String, Timer>{};
 
   RawDatagramSocket? _discoveryListener;
+  RawDatagramSocket? _alternateDiscoveryListener;
   ServerSocket? _serverSocket;
   Socket? _serverConnection;
   Timer? _announcementTimer;
+  Timer? _presenceAnnouncementTimer;
   Timer? _roomsCleanupTimer;
   final Map<String, _ClientPeer> _clients = <String, _ClientPeer>{};
   final Map<String, _HistorySyncTarget> _historySyncTargetsByRequest =
       <String, _HistorySyncTarget>{};
   bool _disposed = false;
 
-  bool get historyEnabled =>
-      mode == ChatMode.hosting ? _hostHistoryEnabled : _joinedRoomHistoryEnabled;
+  bool get historyEnabled => mode == ChatMode.hosting
+      ? _hostHistoryEnabled
+      : _joinedRoomHistoryEnabled;
 
   bool get historyLoading => _historyLoading;
 
@@ -114,6 +117,10 @@ class LanChatController extends ChangeNotifier {
     final String generated = _generateId();
     await prefs.setString(_prefKeyLocalUserId, generated);
     return generated;
+  }
+
+  Future<String> ensureLocalUserId() {
+    return _loadOrCreateLocalUserId();
   }
 
   List<RoomInfo> get discoveredRooms {
@@ -180,6 +187,32 @@ class LanChatController extends ChangeNotifier {
       });
 
       _discoveryListener = listener;
+
+      // If this is the main room discovery controller, also listen on user discovery port
+      // to discover direct chats announced by user-mode controllers
+      if (_discoveryPort == roomDiscoveryPort) {
+        try {
+          final RawDatagramSocket altListener = await RawDatagramSocket.bind(
+            InternetAddress.anyIPv4,
+            userDiscoveryPort,
+            reuseAddress: true,
+          );
+          altListener.listen((RawSocketEvent event) {
+            if (event != RawSocketEvent.read) {
+              return;
+            }
+            final Datagram? datagram = altListener.receive();
+            if (datagram == null) {
+              return;
+            }
+            _onDiscoveryPacket(datagram);
+          });
+          _alternateDiscoveryListener = altListener;
+        } catch (_) {
+          // If alternate discovery listener fails, just continue with primary
+        }
+      }
+
       _roomsCleanupTimer?.cancel();
       _roomsCleanupTimer = Timer.periodic(const Duration(seconds: 2), (_) {
         final DateTime cutoff = DateTime.now().subtract(
@@ -354,9 +387,9 @@ class LanChatController extends ChangeNotifier {
               unawaited(_handleHostDisconnected());
             },
             onError: (Object error) {
-              unawaited(_handleHostDisconnected(
-                reason: 'Socket error: $error',
-              ));
+              unawaited(
+                _handleHostDisconnected(reason: 'Socket error: $error'),
+              );
             },
           );
 
@@ -511,7 +544,70 @@ class LanChatController extends ChangeNotifier {
     _roomsCleanupTimer = null;
     _discoveryListener?.close();
     _discoveryListener = null;
+    _alternateDiscoveryListener?.close();
+    _alternateDiscoveryListener = null;
+    _presenceAnnouncementTimer?.cancel();
+    _presenceAnnouncementTimer = null;
     _roomsByKey.clear();
+  }
+
+  Future<void> updatePresenceAnnouncement({
+    required String userName,
+    required bool hiddenFromNetwork,
+    required bool allowsIdChat,
+  }) async {
+    final String trimmedName = userName.trim();
+    if (trimmedName.isEmpty || hiddenFromNetwork) {
+      _presenceAnnouncementTimer?.cancel();
+      _presenceAnnouncementTimer = null;
+      return;
+    }
+
+    localUserName = trimmedName;
+    localUserId ??= await _loadOrCreateLocalUserId();
+
+    _presenceAnnouncementTimer?.cancel();
+
+    Future<void> announce() async {
+      try {
+        final RawDatagramSocket sender = await RawDatagramSocket.bind(
+          InternetAddress.anyIPv4,
+          0,
+        );
+        sender.broadcastEnabled = true;
+        final List<int> bytes = utf8.encode(
+          jsonEncode(<String, dynamic>{
+            'type': 'announce',
+            'roomName': '__presence__${localUserId ?? trimmedName}',
+            'hostName': trimmedName,
+            'hostUserId': localUserId,
+            'port': userChatPort,
+            'hostIp': hostAddress,
+            'hidden': true,
+            'hostHiddenFromNetwork': hiddenFromNetwork,
+            'hostAllowsIdChat': allowsIdChat,
+            'historyEnabled': false,
+            'securityType': roomSecurityTypeToWire(RoomSecurityType.none),
+            'securityValue': null,
+          }),
+        );
+        sender.send(
+          bytes,
+          InternetAddress('255.255.255.255'),
+          userDiscoveryPort,
+        );
+        sender.close();
+      } catch (_) {
+        // Ignore transient broadcast errors.
+      }
+    }
+
+    await announce();
+    _presenceAnnouncementTimer = Timer.periodic(const Duration(seconds: 2), (
+      _,
+    ) {
+      announce();
+    });
   }
 
   void _onDiscoveryPacket(Datagram datagram) {
@@ -529,6 +625,7 @@ class LanChatController extends ChangeNotifier {
       final RoomInfo room = RoomInfo(
         hostAddress: datagram.address,
         hostName: (decoded['hostName'] ?? 'Host').toString(),
+        hostUserId: (decoded['hostUserId'] ?? '').toString(),
         roomName: (decoded['roomName'] ?? 'Secret Chat').toString(),
         port: port,
         lastSeen: DateTime.now(),
@@ -541,6 +638,8 @@ class LanChatController extends ChangeNotifier {
             (decoded['securityValue'] ?? '').toString().trim().isEmpty
             ? null
             : (decoded['securityValue'] ?? '').toString(),
+        hostHiddenFromNetwork: decoded['hostHiddenFromNetwork'] == true,
+        hostAllowsIdChat: decoded['hostAllowsIdChat'] != false,
       );
       _roomsByKey[room.key] = room;
       _notify();
@@ -583,9 +682,12 @@ class LanChatController extends ChangeNotifier {
             'type': 'announce',
             'roomName': roomName,
             'hostName': localUserName,
+            'hostUserId': localUserId,
             'port': _chatPort,
             'hostIp': hostAddress,
             'hidden': _hostHidden,
+            'hostHiddenFromNetwork': false,
+            'hostAllowsIdChat': true,
             'historyEnabled': _hostHistoryEnabled,
             'securityType': roomSecurityTypeToWire(_hostSecurityType),
             'securityValue': _hostSecurityType == RoomSecurityType.none
@@ -666,9 +768,7 @@ class LanChatController extends ChangeNotifier {
         );
         if (_hostHistoryEnabled) {
           _markPresenceJoined(peer.userId!, at: eventTime);
-          _requestHistorySyncForPeer(
-            peer,
-          );
+          _requestHistorySyncForPeer(peer);
         }
         _broadcastParticipants();
         final DateTime systemEventTime = DateTime.now();
@@ -737,7 +837,7 @@ class LanChatController extends ChangeNotifier {
           final int batteryLevel = decoded['batteryLevel'] is int
               ? decoded['batteryLevel'] as int
               : int.tryParse((decoded['batteryLevel'] ?? '').toString()) ??
-                  peer.batteryLevel;
+                    peer.batteryLevel;
           peer.batteryLevel = batteryLevel;
           final _ParticipantState? state = _participantsById[peer.userId];
           if (state != null) {
@@ -846,14 +946,17 @@ class LanChatController extends ChangeNotifier {
               name: (member['name'] ?? 'Guest').toString(),
               batteryLevel: member['batteryLevel'] is int
                   ? member['batteryLevel'] as int
-                  : int.tryParse((member['batteryLevel'] ?? '').toString()) ?? 50,
-              joinedAt: DateTime.tryParse((member['joinedAt'] ?? '').toString()) ??
+                  : int.tryParse((member['batteryLevel'] ?? '').toString()) ??
+                        50,
+              joinedAt:
+                  DateTime.tryParse((member['joinedAt'] ?? '').toString()) ??
                   DateTime.now(),
             );
             if (member['leftAt'] != null &&
                 member['leftAt'].toString().trim().isNotEmpty) {
               state.leftAt =
-                  DateTime.tryParse(member['leftAt'].toString()) ?? DateTime.now();
+                  DateTime.tryParse(member['leftAt'].toString()) ??
+                  DateTime.now();
             }
             _participantsById[userId] = state;
             _syncPresenceFromParticipant(state);
@@ -977,8 +1080,6 @@ class LanChatController extends ChangeNotifier {
     }
   }
 
-
-
   Map<String, dynamic> _buildHostChatPacket({
     required String senderId,
     required String senderName,
@@ -1036,8 +1137,6 @@ class LanChatController extends ChangeNotifier {
     return false;
   }
 
-
-
   Future<void> loadOlderMessages() async {
     if (!_joinedRoomHistoryEnabled ||
         mode != ChatMode.connected ||
@@ -1070,8 +1169,6 @@ class LanChatController extends ChangeNotifier {
       }
     }
   }
-
-
 
   Future<void> _handleHostDisconnected({String? reason}) async {
     if (mode != ChatMode.connected) {
@@ -1199,8 +1296,6 @@ class LanChatController extends ChangeNotifier {
     }
   }
 
-
-
   void _syncPresenceFromParticipant(_ParticipantState state) {
     final List<_PresenceWindow> windows = _presenceWindowsByUser.putIfAbsent(
       state.userId,
@@ -1271,4 +1366,3 @@ class LanChatController extends ChangeNotifier {
     socket.write('${jsonEncode(payload)}\n');
   }
 }
-
