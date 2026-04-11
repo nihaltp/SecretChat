@@ -5,7 +5,7 @@
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
 
     <application
-        android:label="secret_chat"
+        android:label="Secret Chat"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
