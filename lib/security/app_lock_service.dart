@@ -24,10 +24,8 @@ class LocalAuthAppLockService implements AppLockService {
 
       return _localAuth.authenticate(
         localizedReason: reason,
-        options: const AuthenticationOptions(
-          biometricOnly: false,
-          stickyAuth: true,
-        ),
+        biometricOnly: false,
+        persistAcrossBackgrounding: true,
       );
     } catch (_) {
       return false;
