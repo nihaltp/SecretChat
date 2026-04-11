@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 
 import '../chat/models/room_info.dart';
+import 'models/active_room_item.dart';
 import '../widgets/app_logo_title.dart';
 import 'pattern_lock_screen.dart';
 
@@ -15,7 +16,11 @@ class RoomsScreen extends StatefulWidget {
     required this.isHostNetworkMode,
     required this.canAccessRooms,
     required this.status,
+    this.activeRooms = const <ActiveRoomItem>[],
+    this.activeRoomKey,
     required this.onBack,
+    required this.onResumeActiveRoom,
+    required this.onDisconnectActiveRoom,
     required this.onOpenSettings,
     required this.onRefresh,
     required this.onCreateRoom,
@@ -28,8 +33,12 @@ class RoomsScreen extends StatefulWidget {
   final bool isHostNetworkMode;
   final bool canAccessRooms;
   final String? status;
+  final List<ActiveRoomItem> activeRooms;
+  final String? activeRoomKey;
 
   final VoidCallback onBack;
+  final ValueChanged<String> onResumeActiveRoom;
+  final Future<void> Function(String roomKey) onDisconnectActiveRoom;
   final VoidCallback onOpenSettings;
   final VoidCallback onRefresh;
   final VoidCallback onCreateRoom;
@@ -244,6 +253,85 @@ class _RoomsScreenState extends State<RoomsScreen> {
               ),
             ),
             const SizedBox(height: 10),
+            if (widget.activeRooms.isNotEmpty) ...[
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Rooms listening to'),
+                      const SizedBox(height: 8),
+                      Column(
+                        children: [
+                          for (int i = 0; i < widget.activeRooms.length; i++)
+                            Padding(
+                              padding: EdgeInsets.only(
+                                bottom: i == widget.activeRooms.length - 1
+                                    ? 0
+                                    : 8,
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(widget.activeRooms[i].roomName),
+                                  ),
+                                  if (widget.activeRooms[i].unreadCount > 0)
+                                    Container(
+                                      margin: const EdgeInsets.only(right: 8),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.primaryContainer,
+                                        borderRadius: BorderRadius.circular(
+                                          999,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        '${widget.activeRooms[i].unreadCount}',
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.labelSmall,
+                                      ),
+                                    ),
+                                  FilledButton.icon(
+                                    key: Key(
+                                      'resume_active_room_button_${widget.activeRooms[i].key}',
+                                    ),
+                                    onPressed: () => widget.onResumeActiveRoom(
+                                      widget.activeRooms[i].key,
+                                    ),
+                                    icon: const Icon(Icons.chat),
+                                    label: const Text('Resume'),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  OutlinedButton.icon(
+                                    key: Key(
+                                      'disconnect_active_room_button_${widget.activeRooms[i].key}',
+                                    ),
+                                    onPressed: () async {
+                                      await widget.onDisconnectActiveRoom(
+                                        widget.activeRooms[i].key,
+                                      );
+                                    },
+                                    icon: const Icon(Icons.link_off),
+                                    label: const Text('Leave'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
             if (widget.status != null)
               Text(
                 widget.status!,

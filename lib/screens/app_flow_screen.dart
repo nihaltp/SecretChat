@@ -11,25 +11,28 @@ import '../chat/models/room_creation_data.dart';
 import '../chat/models/room_info.dart';
 import '../platform/hotspot_service.dart';
 import '../security/app_lock_controller.dart';
+import '../settings/default_room_listening_controller.dart';
 import '../settings/theme_controller.dart';
 import 'chat_screen.dart';
 import 'create_room_screen.dart';
+import 'models/app_stage.dart';
 import 'home_screen.dart';
+import 'models/active_room_item.dart';
 import 'rooms_screen.dart';
 import 'settings_screen.dart';
-
-enum AppStage { home, rooms, chat }
 
 class AppFlowScreen extends StatefulWidget {
   const AppFlowScreen({
     super.key,
     required this.themeController,
     required this.appLockController,
+    required this.defaultRoomListeningController,
     this.hotspotService = const MethodChannelHotspotService(),
   });
 
   final ThemeController themeController;
   final AppLockController appLockController;
+  final DefaultRoomListeningController defaultRoomListeningController;
   final HotspotService hotspotService;
 
   @override
@@ -38,7 +41,14 @@ class AppFlowScreen extends StatefulWidget {
 
 class _AppFlowScreenState extends State<AppFlowScreen>
     with WidgetsBindingObserver {
-  final LanChatController _controller = LanChatController();
+  final LanChatController _discoveryController = LanChatController();
+  final Map<String, LanChatController> _roomControllersByKey =
+      <String, LanChatController>{};
+  final Map<String, VoidCallback> _roomListenerByKey = <String, VoidCallback>{};
+  final Map<String, int> _roomUnreadCountByKey = <String, int>{};
+  final Map<String, int> _lastIncomingCountByKey = <String, int>{};
+  final Map<String, bool> _listenOnLeaveByRoomKey = <String, bool>{};
+  final Set<String> _pendingDisposeRoomKeys = <String>{};
   final Connectivity _connectivity = Connectivity();
 
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
@@ -47,29 +57,200 @@ class _AppFlowScreenState extends State<AppFlowScreen>
   bool _isWifiConnected = false;
   bool _isHostNetworkMode = false;
   bool _lockOverlayVisible = false;
+  String? _activeRoomKey;
 
   bool get _canAccessRooms => _isWifiConnected || _isHostNetworkMode;
+
+  LanChatController? get _activeRoomController =>
+      _activeRoomKey == null ? null : _roomControllersByKey[_activeRoomKey!];
+
+  List<ActiveRoomItem> get _activeRooms {
+    final List<ActiveRoomItem> result = <ActiveRoomItem>[];
+    for (final MapEntry<String, LanChatController> entry
+        in _roomControllersByKey.entries) {
+      final LanChatController controller = entry.value;
+      if (controller.mode == ChatMode.idle) {
+        continue;
+      }
+      result.add(
+        ActiveRoomItem(
+          key: entry.key,
+          roomName: controller.roomName ?? 'Room',
+          unreadCount: _roomUnreadCountByKey[entry.key] ?? 0,
+          listenOnLeave: _listenOnLeaveByRoomKey[entry.key] ?? false,
+        ),
+      );
+    }
+    return result;
+  }
+
+  List<RoomInfo> get _visibleDiscoveredRooms {
+    final Set<String> activeRoomNames = _roomControllersByKey.values
+        .where(
+          (LanChatController controller) => controller.mode != ChatMode.idle,
+        )
+        .map(
+          (LanChatController controller) =>
+              (controller.roomName ?? '').trim().toLowerCase(),
+        )
+        .where((String name) => name.isNotEmpty)
+        .toSet();
+
+    return _discoveryController.visibleRooms.where((RoomInfo room) {
+      return !activeRoomNames.contains(room.roomName.trim().toLowerCase());
+    }).toList();
+  }
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     widget.appLockController.addListener(_onAppLockChanged);
+    widget.defaultRoomListeningController.addListener(_onControllersChanged);
+    _discoveryController.addListener(_onControllersChanged);
     widget.appLockController.init().then((_) => _enforceAppLock());
+    widget.defaultRoomListeningController.init();
     _initConnectivity();
-    _controller.setStatus('Choose Host Network or Use Wi-Fi to continue.');
+    _discoveryController.setStatus(
+      'Choose Host Network or Use Wi-Fi to continue.',
+    );
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     widget.appLockController.removeListener(_onAppLockChanged);
+    widget.defaultRoomListeningController.removeListener(_onControllersChanged);
     _connectivitySubscription?.cancel();
-    _controller.dispose();
+    _discoveryController.removeListener(_onControllersChanged);
+    _discoveryController.dispose();
+    for (final String roomKey in _roomControllersByKey.keys.toList()) {
+      final LanChatController? controller = _roomControllersByKey[roomKey];
+      final VoidCallback? listener = _roomListenerByKey[roomKey];
+      if (controller != null && listener != null) {
+        controller.removeListener(listener);
+      }
+      controller?.dispose();
+    }
+    _roomListenerByKey.clear();
+    _roomUnreadCountByKey.clear();
+    _lastIncomingCountByKey.clear();
+    _listenOnLeaveByRoomKey.clear();
+    _pendingDisposeRoomKeys.clear();
+    _roomControllersByKey.clear();
     super.dispose();
   }
 
+  int _incomingMessageCount(LanChatController controller) {
+    final String? localId = controller.localUserId;
+    return controller.messages
+        .where((message) => !message.system && message.senderId != localId)
+        .length;
+  }
+
+  void _attachRoomController({
+    required String roomKey,
+    required LanChatController controller,
+  }) {
+    _roomControllersByKey[roomKey] = controller;
+    _roomUnreadCountByKey.putIfAbsent(roomKey, () => 0);
+    _lastIncomingCountByKey[roomKey] = _incomingMessageCount(controller);
+    _listenOnLeaveByRoomKey.putIfAbsent(roomKey, () => false);
+
+    void listener() {
+      _onRoomControllerChanged(roomKey);
+    }
+
+    _roomListenerByKey[roomKey] = listener;
+    controller.addListener(listener);
+  }
+
+  bool _defaultListenOnLeave() {
+    return widget.defaultRoomListeningController.enabled;
+  }
+
+  void _onRoomControllerChanged(String roomKey) {
+    final LanChatController? controller = _roomControllersByKey[roomKey];
+    if (controller == null) {
+      return;
+    }
+
+    if (controller.mode == ChatMode.idle) {
+      _scheduleRoomDisposal(roomKey);
+      if (mounted) {
+        setState(() {});
+      }
+      return;
+    }
+
+    final int currentIncoming = _incomingMessageCount(controller);
+    final int previousIncoming =
+        _lastIncomingCountByKey[roomKey] ?? currentIncoming;
+    if (currentIncoming > previousIncoming) {
+      final bool isRoomVisible =
+          _stage == AppStage.chat && _activeRoomKey == roomKey;
+      if (!isRoomVisible) {
+        _roomUnreadCountByKey[roomKey] =
+            (_roomUnreadCountByKey[roomKey] ?? 0) +
+            (currentIncoming - previousIncoming);
+      }
+    }
+    _lastIncomingCountByKey[roomKey] = currentIncoming;
+
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  void _openRoom(String roomKey) {
+    if (!_roomControllersByKey.containsKey(roomKey)) {
+      return;
+    }
+    _roomUnreadCountByKey[roomKey] = 0;
+    _activeRoomKey = roomKey;
+    _stage = AppStage.chat;
+  }
+
+  void _scheduleRoomDisposal(String roomKey) {
+    if (_pendingDisposeRoomKeys.contains(roomKey)) {
+      return;
+    }
+    _pendingDisposeRoomKeys.add(roomKey);
+    Future<void>.microtask(() {
+      _pendingDisposeRoomKeys.remove(roomKey);
+      _disposeRoomController(roomKey);
+      if (mounted) {
+        setState(() {});
+      }
+    });
+  }
+
+  void _disposeRoomController(String roomKey) {
+    final LanChatController? controller = _roomControllersByKey.remove(roomKey);
+    if (controller == null) {
+      return;
+    }
+
+    final VoidCallback? listener = _roomListenerByKey.remove(roomKey);
+    if (listener != null) {
+      controller.removeListener(listener);
+    }
+    controller.dispose();
+    _roomUnreadCountByKey.remove(roomKey);
+    _lastIncomingCountByKey.remove(roomKey);
+    _listenOnLeaveByRoomKey.remove(roomKey);
+    if (_activeRoomKey == roomKey) {
+      _activeRoomKey = null;
+    }
+  }
+
   void _onAppLockChanged() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  void _onControllersChanged() {
     if (mounted) {
       setState(() {});
     }
@@ -129,14 +310,14 @@ class _AppFlowScreenState extends State<AppFlowScreen>
     });
 
     if (connected) {
-      _controller.startDiscovery();
+      _discoveryController.startDiscovery();
       if (!_isHostNetworkMode) {
-        _controller.setStatus(
+        _discoveryController.setStatus(
           'Connected to Wi-Fi. You can create or join rooms.',
         );
       }
     } else if (!_isHostNetworkMode) {
-      _controller.setStatus(
+      _discoveryController.setStatus(
         'No Wi-Fi connection. Use Host Network or connect to Wi-Fi.',
       );
     }
@@ -148,6 +329,7 @@ class _AppFlowScreenState extends State<AppFlowScreen>
         builder: (_) => SettingsScreen(
           themeController: widget.themeController,
           appLockController: widget.appLockController,
+          defaultRoomListeningController: widget.defaultRoomListeningController,
         ),
       ),
     );
@@ -166,12 +348,12 @@ class _AppFlowScreenState extends State<AppFlowScreen>
       _isHostNetworkMode = true;
       _stage = AppStage.rooms;
     });
-    _controller.setStatus(
+    _discoveryController.setStatus(
       openedHotspotSettings
           ? 'Hotspot settings opened. Turn on your hotspot, then create a room.'
           : 'Open mobile hotspot settings and turn it on, then create a room.',
     );
-    await _controller.startDiscovery();
+    await _discoveryController.startDiscovery();
   }
 
   Future<void> _onUseWifiSelected(String userName) async {
@@ -203,12 +385,22 @@ class _AppFlowScreenState extends State<AppFlowScreen>
       return;
     }
 
-    if (_controller.isRoomNameTaken(data.roomName)) {
+    if (_discoveryController.isRoomNameTaken(data.roomName)) {
       _showSnack('Room name already exists. Choose a different name.');
       return;
     }
 
-    final bool hosted = await _controller.hostRoom(
+    final String roomKey = 'host:${data.roomName.trim().toLowerCase()}';
+    if (_roomControllersByKey.containsKey(roomKey)) {
+      setState(() {
+        _openRoom(roomKey);
+      });
+      return;
+    }
+
+    final LanChatController roomController = LanChatController();
+
+    final bool hosted = await roomController.hostRoom(
       yourName: _userName,
       room: data.roomName,
       hidden: data.hidden,
@@ -223,10 +415,13 @@ class _AppFlowScreenState extends State<AppFlowScreen>
 
     if (hosted) {
       setState(() {
-        _stage = AppStage.chat;
+        _attachRoomController(roomKey: roomKey, controller: roomController);
+        _listenOnLeaveByRoomKey[roomKey] = _defaultListenOnLeave();
+        _openRoom(roomKey);
       });
     } else {
-      _showSnack(_controller.status ?? 'Unable to create room.');
+      _showSnack(roomController.status ?? 'Unable to create room.');
+      roomController.dispose();
     }
   }
 
@@ -236,7 +431,18 @@ class _AppFlowScreenState extends State<AppFlowScreen>
       return;
     }
 
-    final bool joined = await _controller.joinRoom(
+    final String roomKey = room.key;
+    final LanChatController? existing = _roomControllersByKey[roomKey];
+    if (existing != null && existing.mode != ChatMode.idle) {
+      setState(() {
+        _openRoom(roomKey);
+      });
+      return;
+    }
+
+    final LanChatController roomController = LanChatController();
+
+    final bool joined = await roomController.joinRoom(
       room: room,
       yourName: _userName,
       securityValue: securityValue,
@@ -248,21 +454,73 @@ class _AppFlowScreenState extends State<AppFlowScreen>
 
     if (joined) {
       setState(() {
-        _stage = AppStage.chat;
+        _attachRoomController(roomKey: roomKey, controller: roomController);
+        _listenOnLeaveByRoomKey[roomKey] = _defaultListenOnLeave();
+        _openRoom(roomKey);
       });
     } else {
-      _showSnack(_controller.status ?? 'Unable to join room.');
+      _showSnack(roomController.status ?? 'Unable to join room.');
+      roomController.dispose();
     }
   }
 
   Future<void> _leaveChat() async {
-    await _controller.disconnect();
+    final String? roomKey = _activeRoomKey;
+    final LanChatController? controller = _activeRoomController;
+    if (roomKey == null || controller == null) {
+      setState(() {
+        _stage = AppStage.rooms;
+      });
+      return;
+    }
+
+    if (_listenOnLeaveByRoomKey[roomKey] == true) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _stage = AppStage.rooms;
+      });
+      _showSnack('Listening in background. Open room again to resume chat.');
+      return;
+    }
+
+    await _disconnectRoom(roomKey, showSnack: false);
     if (!mounted) {
       return;
     }
     setState(() {
       _stage = AppStage.rooms;
     });
+  }
+
+  Future<void> _disconnectRoom(String roomKey, {bool showSnack = true}) async {
+    final LanChatController? controller = _roomControllersByKey[roomKey];
+    if (controller == null) {
+      return;
+    }
+
+    await controller.disconnect();
+    _scheduleRoomDisposal(roomKey);
+
+    if (_activeRoomKey == roomKey) {
+      _activeRoomKey = null;
+    }
+
+    if (!mounted) {
+      return;
+    }
+    setState(() {});
+    if (showSnack) {
+      _showSnack('Disconnected from room.');
+    }
+  }
+
+  Future<void> _disconnectActiveRoomFromRooms(String roomKey) async {
+    await _disconnectRoom(roomKey);
+    if (!mounted) {
+      return;
+    }
   }
 
   void _showSnack(String message) {
@@ -291,111 +549,160 @@ class _AppFlowScreenState extends State<AppFlowScreen>
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (BuildContext context, _) {
-        Widget screen;
-        switch (_stage) {
-          case AppStage.home:
-            screen = HomeScreen(
-              onHostPressed: _onHostNetworkSelected,
-              onWifiPressed: _onUseWifiSelected,
-              onOpenSettings: _openSettings,
-            );
-            break;
-          case AppStage.rooms:
-            screen = RoomsScreen(
-              rooms: _controller.visibleRooms,
-              userName: _userName,
-              isHostNetworkMode: _isHostNetworkMode,
-              canAccessRooms: _canAccessRooms,
-              status: _controller.status,
-              onBack: () {
-                setState(() {
-                  _stage = AppStage.home;
-                });
-              },
-              onOpenSettings: _openSettings,
-              onRefresh: _controller.startDiscovery,
-              onCreateRoom: _createRoom,
-              onFindRoomByName: (String name) =>
-                  _controller.findRoomByName(name, includeHidden: true),
-              onJoinRoom: _joinRoom,
-            );
-            break;
-          case AppStage.chat:
-            screen = ChatScreen(
-              controller: _controller,
-              onLeave: _leaveChat,
-              onOpenSettings: _openSettings,
-            );
-            break;
-        }
-
-        final bool lockVisible =
-            _lockOverlayVisible || widget.appLockController.isLocked;
-        final Widget content;
-        if (!lockVisible) {
-          content = screen;
+    Widget screen;
+    switch (_stage) {
+      case AppStage.home:
+        screen = HomeScreen(
+          onHostPressed: _onHostNetworkSelected,
+          onWifiPressed: _onUseWifiSelected,
+          onOpenSettings: _openSettings,
+        );
+        break;
+      case AppStage.rooms:
+        screen = RoomsScreen(
+          rooms: _visibleDiscoveredRooms,
+          userName: _userName,
+          isHostNetworkMode: _isHostNetworkMode,
+          canAccessRooms: _canAccessRooms,
+          status: _discoveryController.status,
+          activeRooms: _activeRooms,
+          activeRoomKey: _activeRoomKey,
+          onBack: () {
+            setState(() {
+              _stage = AppStage.home;
+            });
+          },
+          onResumeActiveRoom: (String roomKey) {
+            if (!_roomControllersByKey.containsKey(roomKey)) {
+              return;
+            }
+            setState(() {
+              _openRoom(roomKey);
+            });
+          },
+          onDisconnectActiveRoom: _disconnectActiveRoomFromRooms,
+          onOpenSettings: _openSettings,
+          onRefresh: _discoveryController.startDiscovery,
+          onCreateRoom: _createRoom,
+          onFindRoomByName: (String name) =>
+              _discoveryController.findRoomByName(name, includeHidden: true),
+          onJoinRoom: _joinRoom,
+        );
+        break;
+      case AppStage.chat:
+        final LanChatController? controller = _activeRoomController;
+        if (controller == null) {
+          screen = RoomsScreen(
+            rooms: _visibleDiscoveredRooms,
+            userName: _userName,
+            isHostNetworkMode: _isHostNetworkMode,
+            canAccessRooms: _canAccessRooms,
+            status: _discoveryController.status,
+            activeRooms: _activeRooms,
+            activeRoomKey: _activeRoomKey,
+            onBack: () {
+              setState(() {
+                _stage = AppStage.home;
+              });
+            },
+            onResumeActiveRoom: (String roomKey) {
+              if (!_roomControllersByKey.containsKey(roomKey)) {
+                return;
+              }
+              setState(() {
+                _openRoom(roomKey);
+              });
+            },
+            onDisconnectActiveRoom: _disconnectActiveRoomFromRooms,
+            onOpenSettings: _openSettings,
+            onRefresh: _discoveryController.startDiscovery,
+            onCreateRoom: _createRoom,
+            onFindRoomByName: (String name) =>
+                _discoveryController.findRoomByName(name, includeHidden: true),
+            onJoinRoom: _joinRoom,
+          );
         } else {
-          content = Stack(
-          children: [
-            screen,
-            Positioned.fill(
-              child: ColoredBox(
-                color: Theme.of(
-                  context,
-                ).colorScheme.surface.withValues(alpha: 0.96),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 320),
-                    child: Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.lock, size: 40),
-                            const SizedBox(height: 10),
-                            const Text(
-                              'App is locked',
-                              style: TextStyle(fontSize: 18),
-                            ),
-                            const SizedBox(height: 8),
-                            const Text(
-                              'Use biometric authentication or your screen lock to continue.',
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 14),
-                            FilledButton.icon(
-                              key: const Key('unlock_app_button'),
-                              onPressed: _enforceAppLock,
-                              icon: const Icon(Icons.fingerprint),
-                              label: const Text('Unlock'),
-                            ),
-                          ],
-                        ),
+          screen = ChatScreen(
+            controller: controller,
+            listenOnLeave: _listenOnLeaveByRoomKey[_activeRoomKey!] ?? false,
+            onListenOnLeaveChanged: (bool enabled) {
+              final String? roomKey = _activeRoomKey;
+              if (roomKey == null) {
+                return;
+              }
+              setState(() {
+                _listenOnLeaveByRoomKey[roomKey] = enabled;
+              });
+            },
+            onLeave: _leaveChat,
+            onOpenSettings: _openSettings,
+          );
+        }
+        break;
+    }
+
+    final bool lockVisible =
+        _lockOverlayVisible || widget.appLockController.isLocked;
+    final Widget content;
+    if (!lockVisible) {
+      content = screen;
+    } else {
+      content = Stack(
+        children: [
+          screen,
+          Positioned.fill(
+            child: ColoredBox(
+              color: Theme.of(
+                context,
+              ).colorScheme.surface.withValues(alpha: 0.96),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 320),
+                  child: Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.lock, size: 40),
+                          const SizedBox(height: 10),
+                          const Text(
+                            'App is locked',
+                            style: TextStyle(fontSize: 18),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Use biometric authentication or your screen lock to continue.',
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 14),
+                          FilledButton.icon(
+                            key: const Key('unlock_app_button'),
+                            onPressed: _enforceAppLock,
+                            icon: const Icon(Icons.fingerprint),
+                            label: const Text('Unlock'),
+                          ),
+                        ],
                       ),
                     ),
                   ),
                 ),
               ),
             ),
-          ],
-          );
-        }
+          ),
+        ],
+      );
+    }
 
-        return PopScope<void>(
-          canPop: _stage == AppStage.home,
-          onPopInvokedWithResult: (bool didPop, void _) {
-            if (didPop) {
-              return;
-            }
-            _handleSystemBack();
-          },
-          child: content,
-        );
+    return PopScope<void>(
+      canPop: _stage == AppStage.home,
+      onPopInvokedWithResult: (bool didPop, void _) {
+        if (didPop) {
+          return;
+        }
+        _handleSystemBack();
       },
+      child: content,
     );
   }
 }

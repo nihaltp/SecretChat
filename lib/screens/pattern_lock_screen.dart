@@ -3,10 +3,9 @@
 
 import 'package:flutter/material.dart';
 
+import 'models/pattern_lock_mode.dart';
 import '../widgets/app_logo_title.dart';
 import '../widgets/pattern_lock_board.dart';
-
-enum PatternLockMode { setup, verify }
 
 class PatternLockScreen extends StatefulWidget {
   const PatternLockScreen.setup({super.key})

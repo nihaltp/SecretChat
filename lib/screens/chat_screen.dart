@@ -11,11 +11,15 @@ class ChatScreen extends StatefulWidget {
   const ChatScreen({
     super.key,
     required this.controller,
+    required this.listenOnLeave,
+    required this.onListenOnLeaveChanged,
     required this.onLeave,
     required this.onOpenSettings,
   });
 
   final LanChatController controller;
+  final bool listenOnLeave;
+  final ValueChanged<bool> onListenOnLeaveChanged;
   final VoidCallback onLeave;
   final VoidCallback onOpenSettings;
 
@@ -72,6 +76,16 @@ class _ChatScreenState extends State<ChatScreen> {
             icon: const Icon(Icons.settings),
           ),
           IconButton(
+            tooltip: widget.listenOnLeave
+                ? 'Listening on leave: On'
+                : 'Listening on leave: Off',
+            onPressed: () =>
+                widget.onListenOnLeaveChanged(!widget.listenOnLeave),
+            icon: Icon(
+              widget.listenOnLeave ? Icons.hearing : Icons.hearing_disabled,
+            ),
+          ),
+          IconButton(
             tooltip: 'Leave',
             onPressed: widget.onLeave,
             icon: const Icon(Icons.link_off),
@@ -106,13 +120,14 @@ class _ChatScreenState extends State<ChatScreen> {
               controller: _scrollController,
               reverse: true,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              itemCount: controller.messages.length +
+              itemCount:
+                  controller.messages.length +
                   ((controller.historyEnabled &&
-                              controller.mode == ChatMode.connected &&
-                              (controller.hasMoreHistory ||
-                                  controller.historyLoading))
-                          ? 1
-                          : 0),
+                          controller.mode == ChatMode.connected &&
+                          (controller.hasMoreHistory ||
+                              controller.historyLoading))
+                      ? 1
+                      : 0),
               itemBuilder: (BuildContext context, int i) {
                 final bool hasHistoryIndicator =
                     controller.historyEnabled &&

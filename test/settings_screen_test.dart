@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:secret_chat/security/app_lock_controller.dart';
 import 'package:secret_chat/security/app_lock_service.dart';
 import 'package:secret_chat/screens/settings_screen.dart';
+import 'package:secret_chat/settings/default_room_listening_controller.dart';
 import 'package:secret_chat/settings/theme_controller.dart';
 
 class _FakeAppLockService implements AppLockService {
@@ -21,12 +22,15 @@ void main() {
     final AppLockController appLockController = AppLockController(
       service: _FakeAppLockService(),
     );
+    final DefaultRoomListeningController defaultRoomListeningController =
+        DefaultRoomListeningController();
 
     await tester.pumpWidget(
       MaterialApp(
         home: SettingsScreen(
           themeController: controller,
           appLockController: appLockController,
+          defaultRoomListeningController: defaultRoomListeningController,
         ),
       ),
     );
@@ -42,5 +46,12 @@ void main() {
     await tester.tap(find.byKey(const Key('app_lock_switch')));
     await tester.pump();
     expect(find.byKey(const Key('app_lock_switch')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('default_room_listening_switch')));
+    await tester.pump();
+    expect(
+      find.byKey(const Key('default_room_listening_switch')),
+      findsOneWidget,
+    );
   });
 }

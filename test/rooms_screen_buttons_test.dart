@@ -6,6 +6,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:secret_chat/chat/models/room_info.dart';
+import 'package:secret_chat/screens/models/active_room_item.dart';
 import 'package:secret_chat/screens/rooms_screen.dart';
 
 void main() {
@@ -34,7 +35,11 @@ void main() {
           isHostNetworkMode: false,
           canAccessRooms: true,
           status: 'Ready',
+          activeRooms: const <ActiveRoomItem>[],
+          activeRoomKey: null,
           onBack: () {},
+          onResumeActiveRoom: (String roomKey) {},
+          onDisconnectActiveRoom: (String roomKey) async {},
           onOpenSettings: () {},
           onRefresh: () {
             refreshTapped = true;
@@ -75,7 +80,11 @@ void main() {
           isHostNetworkMode: false,
           canAccessRooms: false,
           status: 'No network',
+          activeRooms: const <ActiveRoomItem>[],
+          activeRoomKey: null,
           onBack: () {},
+          onResumeActiveRoom: (String roomKey) {},
+          onDisconnectActiveRoom: (String roomKey) async {},
           onOpenSettings: () {},
           onRefresh: () {},
           onCreateRoom: () {},
