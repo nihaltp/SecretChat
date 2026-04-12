@@ -79,6 +79,7 @@ class LanChatController extends ChangeNotifier {
   RawDatagramSocket? _alternateDiscoveryListener;
   ServerSocket? _serverSocket;
   Socket? _serverConnection;
+  int _presenceSequence = 0;
   Timer? _announcementTimer;
   Timer? _presenceAnnouncementTimer;
   Timer? _roomsCleanupTimer;
@@ -104,7 +105,17 @@ class LanChatController extends ChangeNotifier {
     }
   }
 
-  Future<String> _loadOrCreateLocalUserId() async {
+  Future<String>? _pendingLocalUserIdFuture;
+  
+  Future<String> _loadOrCreateLocalUserId() {
+    if (_pendingLocalUserIdFuture != null) {
+      return _pendingLocalUserIdFuture!;
+    }
+    _pendingLocalUserIdFuture = _doLoadOrCreateLocalUserId();
+    return _pendingLocalUserIdFuture!;
+  }
+
+  Future<String> _doLoadOrCreateLocalUserId() async {
     if (_localUserIdProvider != null) {
       return _localUserIdProvider();
     }
@@ -120,8 +131,9 @@ class LanChatController extends ChangeNotifier {
     return generated;
   }
 
-  Future<String> ensureLocalUserId() {
-    return _loadOrCreateLocalUserId();
+  Future<String> ensureLocalUserId() async {
+    localUserId ??= await _loadOrCreateLocalUserId();
+    return localUserId!;
   }
 
   List<RoomInfo> get discoveredRooms {
@@ -579,8 +591,12 @@ class LanChatController extends ChangeNotifier {
     localUserId ??= await _loadOrCreateLocalUserId();
 
     _presenceAnnouncementTimer?.cancel();
+    _presenceAnnouncementTimer = null;
+
+    final int currentSequence = ++_presenceSequence;
 
     Future<void> announce() async {
+      if (_presenceSequence != currentSequence) return;
       try {
         final RawDatagramSocket sender = await RawDatagramSocket.bind(
           InternetAddress.anyIPv4,
@@ -615,6 +631,8 @@ class LanChatController extends ChangeNotifier {
     }
 
     await announce();
+    if (_presenceSequence != currentSequence) return;
+
     _presenceAnnouncementTimer = Timer.periodic(const Duration(seconds: 2), (
       _,
     ) {
