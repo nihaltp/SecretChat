@@ -10,6 +10,7 @@ import 'package:battery_plus/battery_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'failover_weights.dart';
 import '../chat_constants.dart';
 import '../models/chat_message.dart';
 import '../models/room_info.dart';
@@ -86,6 +87,19 @@ class LanChatController extends ChangeNotifier {
   final Map<String, _ClientPeer> _clients = <String, _ClientPeer>{};
   final Map<String, _HistorySyncTarget> _historySyncTargetsByRequest =
       <String, _HistorySyncTarget>{};
+  final Map<String, Completer<int?>> _pendingProbeResultsById =
+      <String, Completer<int?>>{};
+  final Map<String, int> _probeSentAtById = <String, int>{};
+  final Map<String, Completer<_FailoverLatencyReport?>>
+  _pendingFailoverReportsByUser =
+      <String, Completer<_FailoverLatencyReport?>>{};
+  final Map<String, _FailoverLatencyReport> _failoverReportsByUser =
+      <String, _FailoverLatencyReport>{};
+  int _failoverEpoch = 0;
+  int _activeProbeEpoch = 0;
+  bool _isTemporaryFailoverHost = false;
+  bool _finalHostSelectionInProgress = false;
+  String? _preferredFailoverHostUserId;
   bool _disposed = false;
 
   bool get historyEnabled => mode == ChatMode.hosting
@@ -108,7 +122,7 @@ class LanChatController extends ChangeNotifier {
   // Must stay instance-scoped: a static Future can be shared across multiple
   // controllers and leak one user's ID into another controller.
   Future<String>? _pendingLocalUserIdFuture;
-  
+
   Future<String> _loadOrCreateLocalUserId() {
     if (_pendingLocalUserIdFuture != null) {
       return _pendingLocalUserIdFuture!;
@@ -283,6 +297,13 @@ class LanChatController extends ChangeNotifier {
       _historyLoading = false;
       _pendingHistoryRequests.clear();
       _historySyncTargetsByRequest.clear();
+      _pendingProbeResultsById.clear();
+      _probeSentAtById.clear();
+      _pendingFailoverReportsByUser.clear();
+      _failoverReportsByUser.clear();
+      _preferredFailoverHostUserId = null;
+      _finalHostSelectionInProgress = false;
+      _isTemporaryFailoverHost = false;
       _messageIds.clear();
 
       if (_hostHistoryEnabled) {
@@ -362,6 +383,13 @@ class LanChatController extends ChangeNotifier {
     _historyLoading = false;
     _historyRequestCounter = 0;
     _pendingHistoryRequests.clear();
+    _pendingProbeResultsById.clear();
+    _probeSentAtById.clear();
+    _pendingFailoverReportsByUser.clear();
+    _failoverReportsByUser.clear();
+    _preferredFailoverHostUserId = null;
+    _finalHostSelectionInProgress = false;
+    _isTemporaryFailoverHost = false;
     if (!preserveLocalState) {
       _messageIds.clear();
       _participantsById.clear();
@@ -529,6 +557,25 @@ class LanChatController extends ChangeNotifier {
     _historyLoading = false;
     _historyRequestCounter = 0;
     _awaitingFailover = false;
+    _activeProbeEpoch = 0;
+    _preferredFailoverHostUserId = null;
+    _finalHostSelectionInProgress = false;
+    _isTemporaryFailoverHost = false;
+    _probeSentAtById.clear();
+    for (final Completer<int?> completer in _pendingProbeResultsById.values) {
+      if (!completer.isCompleted) {
+        completer.complete(null);
+      }
+    }
+    _pendingProbeResultsById.clear();
+    for (final Completer<_FailoverLatencyReport?> completer
+        in _pendingFailoverReportsByUser.values) {
+      if (!completer.isCompleted) {
+        completer.complete(null);
+      }
+    }
+    _pendingFailoverReportsByUser.clear();
+    _failoverReportsByUser.clear();
     for (final Completer<void> completer in _pendingHistoryRequests.values) {
       if (!completer.isCompleted) {
         completer.complete();
@@ -879,6 +926,105 @@ class LanChatController extends ChangeNotifier {
         return;
       }
 
+      if (type == 'failoverHostProbeAck') {
+        final String probeId = (decoded['probeId'] ?? '').toString();
+        if (probeId.isEmpty) {
+          return;
+        }
+        final int? sentAt = _probeSentAtById.remove(probeId);
+        final Completer<int?>? completer = _pendingProbeResultsById.remove(
+          probeId,
+        );
+        if (completer == null || completer.isCompleted) {
+          return;
+        }
+        if (sentAt == null) {
+          completer.complete(null);
+          return;
+        }
+        completer.complete(DateTime.now().millisecondsSinceEpoch - sentAt);
+        return;
+      }
+
+      if (type == 'failoverProbe') {
+        final String probeId = (decoded['probeId'] ?? '').toString();
+        final String targetUserId = (decoded['targetUserId'] ?? '').toString();
+        if (probeId.isEmpty || targetUserId.isEmpty || peer.userId == null) {
+          return;
+        }
+
+        if (targetUserId == localUserId) {
+          _sendLine(peer.socket, <String, dynamic>{
+            'type': 'failoverProbeAck',
+            'probeId': probeId,
+          });
+          return;
+        }
+
+        final _ClientPeer? targetPeer = _findPeerByUserId(targetUserId);
+        if (targetPeer == null) {
+          _sendLine(peer.socket, <String, dynamic>{
+            'type': 'failoverProbeAck',
+            'probeId': probeId,
+            'unreachable': true,
+          });
+          return;
+        }
+
+        _sendLine(targetPeer.socket, <String, dynamic>{
+          'type': 'failoverProbeForward',
+          'probeId': probeId,
+          'sourceUserId': peer.userId,
+        });
+        return;
+      }
+
+      if (type == 'failoverProbeForwardAck') {
+        final String probeId = (decoded['probeId'] ?? '').toString();
+        final String sourceUserId = (decoded['sourceUserId'] ?? '').toString();
+        if (probeId.isEmpty || sourceUserId.isEmpty) {
+          return;
+        }
+
+        final _ClientPeer? sourcePeer = _findPeerByUserId(sourceUserId);
+        if (sourcePeer == null) {
+          return;
+        }
+
+        _sendLine(sourcePeer.socket, <String, dynamic>{
+          'type': 'failoverProbeAck',
+          'probeId': probeId,
+        });
+        return;
+      }
+
+      if (type == 'failoverProbeReport') {
+        if (peer.userId == null) {
+          return;
+        }
+        final int? averageRttMs = decoded['averageRttMs'] is int
+            ? decoded['averageRttMs'] as int
+            : int.tryParse((decoded['averageRttMs'] ?? '').toString());
+        final _FailoverLatencyReport report = _FailoverLatencyReport(
+          userId: peer.userId!,
+          averageRttMs: averageRttMs,
+          successfulProbes: decoded['successfulProbes'] is int
+              ? decoded['successfulProbes'] as int
+              : int.tryParse((decoded['successfulProbes'] ?? '').toString()) ??
+                    0,
+          totalProbes: decoded['totalProbes'] is int
+              ? decoded['totalProbes'] as int
+              : int.tryParse((decoded['totalProbes'] ?? '').toString()) ?? 0,
+        );
+        _failoverReportsByUser[peer.userId!] = report;
+        final Completer<_FailoverLatencyReport?>? completer =
+            _pendingFailoverReportsByUser[peer.userId!];
+        if (completer != null && !completer.isCompleted) {
+          completer.complete(report);
+        }
+        return;
+      }
+
       if (type == 'historyRequest') {
         final String requestId = (decoded['requestId'] ?? '').toString();
         final String targetUserId =
@@ -994,6 +1140,80 @@ class LanChatController extends ChangeNotifier {
             _syncPresenceFromParticipant(state);
           }
         }
+        return;
+      }
+      if (type == 'failoverProbeRound') {
+        if (_serverConnection == null || localUserId == null) {
+          return;
+        }
+        final int epoch = decoded['epoch'] is int
+            ? decoded['epoch'] as int
+            : int.tryParse((decoded['epoch'] ?? '').toString()) ?? 0;
+        _activeProbeEpoch = epoch;
+        final List<String> targets = (decoded['targets'] is List)
+            ? (decoded['targets'] as List)
+                  .map((dynamic e) => e.toString())
+                  .where((value) => value.isNotEmpty)
+                  .toList()
+            : <String>[];
+        unawaited(_sendFailoverProbeReport(epoch, targets));
+        return;
+      }
+      if (type == 'failoverHostProbe') {
+        if (_serverConnection == null) {
+          return;
+        }
+        final String probeId = (decoded['probeId'] ?? '').toString();
+        if (probeId.isEmpty) {
+          return;
+        }
+        _sendLine(_serverConnection!, <String, dynamic>{
+          'type': 'failoverHostProbeAck',
+          'probeId': probeId,
+        });
+        return;
+      }
+      if (type == 'failoverProbeForward') {
+        if (_serverConnection == null) {
+          return;
+        }
+        final String probeId = (decoded['probeId'] ?? '').toString();
+        final String sourceUserId = (decoded['sourceUserId'] ?? '').toString();
+        if (probeId.isEmpty || sourceUserId.isEmpty) {
+          return;
+        }
+        _sendLine(_serverConnection!, <String, dynamic>{
+          'type': 'failoverProbeForwardAck',
+          'probeId': probeId,
+          'sourceUserId': sourceUserId,
+        });
+        return;
+      }
+      if (type == 'failoverProbeAck') {
+        final String probeId = (decoded['probeId'] ?? '').toString();
+        if (probeId.isEmpty) {
+          return;
+        }
+        final int? sentAt = _probeSentAtById.remove(probeId);
+        final Completer<int?>? completer = _pendingProbeResultsById.remove(
+          probeId,
+        );
+        if (completer == null || completer.isCompleted) {
+          return;
+        }
+        if (sentAt == null) {
+          completer.complete(null);
+          return;
+        }
+        completer.complete(DateTime.now().millisecondsSinceEpoch - sentAt);
+        return;
+      }
+      if (type == 'failoverFinalHost') {
+        final String winnerUserId = (decoded['winnerUserId'] ?? '').toString();
+        if (winnerUserId.isEmpty) {
+          return;
+        }
+        _preferredFailoverHostUserId = winnerUserId;
         return;
       }
       if (type == 'historyPage') {
@@ -1212,13 +1432,25 @@ class LanChatController extends ChangeNotifier {
     _historyLoading = false;
     status = reason ?? 'Host disconnected. Looking for failover host.';
 
-    final _ParticipantState? leader = _selectHostCandidate();
+    final _ParticipantState? leader = _selectFailoverLeader();
     if (leader != null && leader.userId == localUserId) {
       await _promoteToHost();
+      unawaited(_runTemporaryHostOptimizationRound());
       return;
     }
 
     _notify();
+  }
+
+  _ParticipantState? _selectFailoverLeader() {
+    final String? preferredId = _preferredFailoverHostUserId;
+    if (preferredId != null && preferredId.isNotEmpty) {
+      final _ParticipantState? preferred = _participantsById[preferredId];
+      if (preferred != null && preferred.leftAt == null) {
+        return preferred;
+      }
+    }
+    return _selectHostCandidate();
   }
 
   _ParticipantState? _selectHostCandidate() {
@@ -1249,6 +1481,8 @@ class LanChatController extends ChangeNotifier {
       return;
     }
 
+    _isTemporaryFailoverHost = true;
+    _finalHostSelectionInProgress = false;
     _awaitingFailover = false;
     mode = ChatMode.hosting;
     _hostHidden = _roomHidden;
@@ -1291,6 +1525,303 @@ class LanChatController extends ChangeNotifier {
     _startAnnouncements();
     status = 'Hosting recovered room on local network';
     _notify();
+  }
+
+  Future<void> _runTemporaryHostOptimizationRound() async {
+    if (!_isTemporaryFailoverHost ||
+        mode != ChatMode.hosting ||
+        _finalHostSelectionInProgress ||
+        localUserId == null) {
+      return;
+    }
+
+    _finalHostSelectionInProgress = true;
+    final int epoch = ++_failoverEpoch;
+    status = 'Running failover latency checks...';
+    _notify();
+
+    await Future<void>.delayed(const Duration(milliseconds: 1200));
+    if (mode != ChatMode.hosting || !_isTemporaryFailoverHost) {
+      _finalHostSelectionInProgress = false;
+      return;
+    }
+
+    final List<_ParticipantState> candidates = _participantsById.values
+        .where((member) => member.leftAt == null)
+        .toList();
+    if (candidates.length <= 1) {
+      _isTemporaryFailoverHost = false;
+      _finalHostSelectionInProgress = false;
+      status = 'Hosting recovered room on local network';
+      _notify();
+      return;
+    }
+
+    _failoverReportsByUser.clear();
+    final List<String> candidateUserIds = candidates
+        .map((member) => member.userId)
+        .toSet()
+        .toList();
+
+    _failoverReportsByUser[localUserId!] = await _measureLatencyAsCurrentHost(
+      candidateUserIds,
+    );
+
+    for (final _ParticipantState candidate in candidates) {
+      if (candidate.userId == localUserId) {
+        continue;
+      }
+      final _ClientPeer? peer = _findPeerByUserId(candidate.userId);
+      if (peer == null) {
+        continue;
+      }
+
+      final Completer<_FailoverLatencyReport?> completer =
+          Completer<_FailoverLatencyReport?>();
+      _pendingFailoverReportsByUser[candidate.userId] = completer;
+      _sendLine(peer.socket, <String, dynamic>{
+        'type': 'failoverProbeRound',
+        'epoch': epoch,
+        'targets': candidateUserIds,
+      });
+
+      final _FailoverLatencyReport? report = await completer.future.timeout(
+        const Duration(seconds: 6),
+        onTimeout: () => null,
+      );
+      _pendingFailoverReportsByUser.remove(candidate.userId);
+      if (report != null) {
+        _failoverReportsByUser[candidate.userId] = report;
+      }
+    }
+
+    if (mode != ChatMode.hosting) {
+      _finalHostSelectionInProgress = false;
+      return;
+    }
+
+    final _ParticipantState winner = _chooseBestFinalFailoverHost(candidates);
+    _preferredFailoverHostUserId = winner.userId;
+
+    final Map<String, dynamic> finalPacket = <String, dynamic>{
+      'type': 'failoverFinalHost',
+      'epoch': epoch,
+      'winnerUserId': winner.userId,
+    };
+    _broadcast(finalPacket);
+    await Future<void>.delayed(const Duration(milliseconds: 250));
+    _broadcast(finalPacket);
+
+    if (winner.userId == localUserId) {
+      _isTemporaryFailoverHost = false;
+      _finalHostSelectionInProgress = false;
+      status = 'Failover host finalized.';
+      _notify();
+      return;
+    }
+
+    await _stepDownForFinalFailoverHost();
+    _finalHostSelectionInProgress = false;
+  }
+
+  _ClientPeer? _findPeerByUserId(String userId) {
+    for (final _ClientPeer peer in _clients.values) {
+      if (peer.userId == userId) {
+        return peer;
+      }
+    }
+    return null;
+  }
+
+  Future<_FailoverLatencyReport> _measureLatencyAsCurrentHost(
+    List<String> candidateUserIds,
+  ) async {
+    int total = 0;
+    int successful = 0;
+    int rttSum = 0;
+
+    for (final String targetUserId in candidateUserIds) {
+      if (targetUserId == localUserId) {
+        continue;
+      }
+      final _ClientPeer? target = _findPeerByUserId(targetUserId);
+      if (target == null) {
+        continue;
+      }
+
+      final String probeId = 'probe-${_generateId()}';
+      final Completer<int?> completer = Completer<int?>();
+      _pendingProbeResultsById[probeId] = completer;
+      _probeSentAtById[probeId] = DateTime.now().millisecondsSinceEpoch;
+      _sendLine(target.socket, <String, dynamic>{
+        'type': 'failoverHostProbe',
+        'probeId': probeId,
+      });
+
+      total += 1;
+      final int? rtt = await completer.future.timeout(
+        const Duration(milliseconds: 900),
+        onTimeout: () => null,
+      );
+      _pendingProbeResultsById.remove(probeId);
+      _probeSentAtById.remove(probeId);
+      if (rtt != null) {
+        successful += 1;
+        rttSum += rtt;
+      }
+    }
+
+    final int? averageRttMs = successful == 0
+        ? null
+        : (rttSum / successful).round();
+
+    return _FailoverLatencyReport(
+      userId: localUserId!,
+      averageRttMs: averageRttMs,
+      successfulProbes: successful,
+      totalProbes: total,
+    );
+  }
+
+  _ParticipantState _chooseBestFinalFailoverHost(
+    List<_ParticipantState> candidates,
+  ) {
+    final List<_ParticipantState> ranked = List<_ParticipantState>.from(
+      candidates,
+    );
+
+    ranked.sort((a, b) {
+      final _FailoverLatencyReport? aReport = _failoverReportsByUser[a.userId];
+      final _FailoverLatencyReport? bReport = _failoverReportsByUser[b.userId];
+
+      final double aScore = computeFailoverHostScore(
+        averageRttMs: aReport?.averageRttMs,
+        batteryLevel: a.batteryLevel,
+      );
+      final double bScore = computeFailoverHostScore(
+        averageRttMs: bReport?.averageRttMs,
+        batteryLevel: b.batteryLevel,
+      );
+
+      final int scoreCompare = bScore.compareTo(aScore);
+      if (scoreCompare != 0) {
+        return scoreCompare;
+      }
+
+      final int batteryCompare = b.batteryLevel.compareTo(a.batteryLevel);
+      if (batteryCompare != 0) {
+        return batteryCompare;
+      }
+
+      final int joinCompare = a.joinedAt.compareTo(b.joinedAt);
+      if (joinCompare != 0) {
+        return joinCompare;
+      }
+
+      return a.userId.compareTo(b.userId);
+    });
+
+    return ranked.first;
+  }
+
+  Future<void> _stepDownForFinalFailoverHost() async {
+    _announcementTimer?.cancel();
+    _announcementTimer = null;
+
+    for (final _ClientPeer peer in _clients.values.toList()) {
+      await peer.socket.close();
+    }
+    _clients.clear();
+
+    await _serverSocket?.close();
+    _serverSocket = null;
+
+    _isTemporaryFailoverHost = false;
+    _awaitingFailover = true;
+    mode = ChatMode.connected;
+    status = 'Switching to optimized failover host...';
+    _notify();
+  }
+
+  Future<void> _sendFailoverProbeReport(
+    int epoch,
+    List<String> targetUserIds,
+  ) async {
+    if (_serverConnection == null || localUserId == null) {
+      return;
+    }
+
+    final _FailoverLatencyReport report = await _measureLatencyAsClient(
+      epoch,
+      targetUserIds,
+    );
+    if (_serverConnection == null || _activeProbeEpoch != epoch) {
+      return;
+    }
+
+    _sendLine(_serverConnection!, <String, dynamic>{
+      'type': 'failoverProbeReport',
+      'epoch': epoch,
+      'userId': localUserId,
+      'averageRttMs': report.averageRttMs,
+      'successfulProbes': report.successfulProbes,
+      'totalProbes': report.totalProbes,
+    });
+  }
+
+  Future<_FailoverLatencyReport> _measureLatencyAsClient(
+    int epoch,
+    List<String> targetUserIds,
+  ) async {
+    int rttSum = 0;
+    int successful = 0;
+    int total = 0;
+
+    for (final String targetUserId in targetUserIds) {
+      if (targetUserId == localUserId) {
+        continue;
+      }
+      if (_activeProbeEpoch != epoch) {
+        break;
+      }
+      if (mode != ChatMode.connected || _serverConnection == null) {
+        break;
+      }
+
+      total += 1;
+      final String probeId = 'probe-${_generateId()}';
+      final Completer<int?> completer = Completer<int?>();
+      _pendingProbeResultsById[probeId] = completer;
+      _probeSentAtById[probeId] = DateTime.now().millisecondsSinceEpoch;
+
+      _sendLine(_serverConnection!, <String, dynamic>{
+        'type': 'failoverProbe',
+        'epoch': epoch,
+        'probeId': probeId,
+        'targetUserId': targetUserId,
+      });
+
+      final int? rtt = await completer.future.timeout(
+        const Duration(milliseconds: 900),
+        onTimeout: () => null,
+      );
+      _pendingProbeResultsById.remove(probeId);
+      _probeSentAtById.remove(probeId);
+      if (rtt != null) {
+        rttSum += rtt;
+        successful += 1;
+      }
+    }
+
+    final int? averageRttMs = successful == 0
+        ? null
+        : (rttSum / successful).round();
+    return _FailoverLatencyReport(
+      userId: localUserId ?? '',
+      averageRttMs: averageRttMs,
+      successfulProbes: successful,
+      totalProbes: total,
+    );
   }
 
   void _applyPresenceEvent(Map<String, dynamic> packet) {

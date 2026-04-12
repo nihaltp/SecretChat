@@ -22,6 +22,20 @@ class _HistorySyncTarget {
   final String targetUserId;
 }
 
+class _FailoverLatencyReport {
+  _FailoverLatencyReport({
+    required this.userId,
+    required this.averageRttMs,
+    required this.successfulProbes,
+    required this.totalProbes,
+  });
+
+  final String userId;
+  final int? averageRttMs;
+  final int successfulProbes;
+  final int totalProbes;
+}
+
 class _ParticipantState {
   _ParticipantState({
     required this.userId,
