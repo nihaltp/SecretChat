@@ -54,6 +54,15 @@ extension on LanChatController {
   List<Map<String, dynamic>> _buildLocalHistoryMessagesForTarget(
     String targetUserId,
   ) {
+    // Direct one-to-one chats should replay sender-side pending messages
+    // even if the recipient was not yet marked present.
+    if (_hostHidden && _chatPort == userChatPort) {
+      final List<_HistoryEntry> pending = List<_HistoryEntry>.from(
+        _localSentEntries,
+      )..sort((a, b) => a.sequence.compareTo(b.sequence));
+      return pending.map((entry) => entry.toPacket()).toList();
+    }
+
     final List<_PresenceWindow> windows =
         _presenceWindowsByUser[targetUserId] ?? <_PresenceWindow>[];
     if (windows.isEmpty) {
