@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.1.5 - 2026-04-12
+
+- Improved host failover reliability with a staged election flow:
+  - Temporary host is selected immediately on host loss.
+  - Temporary host runs a probe round and finalizes host selection using latency plus battery score.
+  - Added dedicated failover scoring weights in `lib/chat/controllers/failover_weights.dart`.
+- Strengthened failover validation:
+  - Added `test/failover_weights_test.dart` for latency and battery scoring behavior.
+- Lint and analyzer alignment updates across chat controllers, screens, and tests.
+
 ## v1.1.4 - 2026-04-12
 
 - Refined direct-chat discovery and badge behavior:
