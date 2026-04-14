@@ -1,0 +1,5 @@
+v1.1.2 - Default Listening and Release Tooling
+• Default room listening toggle to automatically enter discovered rooms
+• Stability and formatting cleanup across chat and test modules
+• Android release build tuning and debug symbol configuration updates
+• Added release automation script for split-ABI APK packaging flow

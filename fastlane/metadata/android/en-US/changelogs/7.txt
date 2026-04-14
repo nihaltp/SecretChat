@@ -1,0 +1,7 @@
+v1.1.5 - Staged Failover Host Optimization
+• Host failover now runs in two steps:
+	- Temporary host is selected immediately when the host disconnects
+	- Temporary host runs probe rounds and finalizes host using latency + battery score
+• Added dedicated failover scoring weights in failover_weights.dart
+• Added test coverage for failover host scoring behavior
+• General lint/alignment cleanup across controllers, screens, and tests
