@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.2.0 - 2026-04-14
+
+- Added Signal-style direct-chat E2EE foundation:
+  - X3DH-style session bootstrap using Ed25519 identity keys and X25519 pre-keys.
+  - Double Ratchet-style per-message AES-256-GCM key evolution for direct chat.
+  - Volatile-only key/session lifecycle with explicit in-memory session wipe paths.
+- Integrated direct-chat encryption wiring into controller flow:
+  - peer bundle exchange on direct join/accept
+  - encrypted direct message send/receive handling
+  - direct-session cleanup on disconnect
+- Added encryption test coverage:
+  - handshake path, ratchet progression, bidirectional decrypt, and session clearing behavior.
+- Updated SSOT docs with a dedicated E2EE model reference and architecture links.
+- Improved debug startup responsiveness:
+  - deferred heavy startup initialization after first frame
+  - reduced redundant discovery restarts on duplicate connectivity callbacks
+  - coalesced frequent controller-triggered UI refreshes to once-per-frame updates
+
 ## v1.1.5 - 2026-04-12
 
 - Improved host failover reliability with a staged election flow:

@@ -1,3 +1,16 @@
+v1.2.0 - Direct Chat E2EE and Startup Responsiveness
+• Added Signal-style direct-chat E2EE foundation:
+	- X3DH-style bootstrap with Ed25519 identity + X25519 pre-keys
+	- Double Ratchet-style per-message AES-256-GCM key evolution
+	- In-memory session/key lifecycle with explicit wipe paths
+• Integrated encrypted direct-message flow in controller join/send/receive/disconnect paths
+• Added encryption-focused tests for handshake, ratchet progression, bidirectional decrypt, and session clearing
+• Added dedicated E2EE SSOT documentation for packet model, lifecycle, and constraints
+• Startup responsiveness improvements:
+	- deferred heavy startup initialization until after first frame
+	- reduced duplicate discovery restarts from noisy connectivity callbacks
+	- throttled high-frequency UI refresh triggers to once-per-frame
+
 v1.1.5 - Staged Failover Host Optimization
 • Host failover now runs in two steps:
 	- Temporary host is selected immediately when the host disconnects
