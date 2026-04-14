@@ -2,7 +2,9 @@
 // Copyright (c) 2026 Secret Chat Contributors
 
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
+import 'package:secret_chat/chat/chat_constants.dart';
 import 'package:secret_chat/security/app_lock_controller.dart';
 import 'package:secret_chat/settings/default_room_listening_controller.dart';
 import 'package:secret_chat/settings/network_privacy_controller.dart';
@@ -29,6 +31,11 @@ class SettingsScreen extends StatelessWidget {
   final VoidCallback? onOpenNetworkOverview;
   final VoidCallback? onOpenRooms;
   final VoidCallback? onOpenSettings;
+
+  Future<String> _appVersionLabel() async {
+    final PackageInfo info = await PackageInfo.fromPlatform();
+    return '${info.version}+${info.buildNumber}';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -63,73 +70,113 @@ class SettingsScreen extends StatelessWidget {
                         automaticallyImplyLeading: false,
                         title: const AppLogoTitle('Settings'),
                       ),
-                      body: ListView(
-                        padding: const EdgeInsets.all(16),
+                      body: Column(
                         children: [
-                          SwitchListTile(
-                            key: const Key('dark_theme_switch'),
-                            title: const Text('Dark theme'),
-                            subtitle: const Text(
-                              'Dark is default. Turn off to use light theme.',
-                            ),
-                            value: themeController.isDarkMode,
-                            onChanged: themeController.setDarkMode,
-                          ),
-                          SwitchListTile(
-                            key: const Key('default_room_listening_switch'),
-                            title: const Text('Default room listening'),
-                            subtitle: const Text(
-                              'When you join a room, start with listening in background turned on.',
-                            ),
-                            value: defaultRoomListeningController.enabled,
-                            onChanged:
-                                defaultRoomListeningController.setEnabled,
-                          ),
-                          SwitchListTile(
-                            key: const Key('network_hide_from_network_switch'),
-                            title: const Text('Hide me from network'),
-                            subtitle: const Text(
-                              'Do not show your profile in the network user list.',
-                            ),
-                            value: networkPrivacyController.hideFromNetwork,
-                            onChanged:
-                                networkPrivacyController.setHideFromNetwork,
-                          ),
-                          if (networkPrivacyController.hideFromNetwork)
-                            SwitchListTile(
-                              key: const Key('network_block_chat_by_id_switch'),
-                              title: const Text('Block chat by network ID'),
-                              subtitle: const Text(
-                                'Prevent users from chatting to you using your network ID.',
-                              ),
-                              value: networkPrivacyController
-                                  .blockIdChatWhenHidden,
-                              onChanged: networkPrivacyController
-                                  .setBlockIdChatWhenHidden,
-                            ),
-                          SwitchListTile(
-                            key: const Key('app_lock_switch'),
-                            title: const Text('App lock'),
-                            subtitle: const Text(
-                              'Use biometric if available, otherwise fallback to device screen lock.',
-                            ),
-                            value: appLockController.enabled,
-                            onChanged: (bool enabled) async {
-                              final bool ok = await appLockController
-                                  .setEnabled(enabled);
-                              if (!context.mounted) {
-                                return;
-                              }
-                              if (!ok) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'Authentication failed. App lock unchanged.',
-                                    ),
+                          Expanded(
+                            child: ListView(
+                              padding: const EdgeInsets.all(16),
+                              children: [
+                                SwitchListTile(
+                                  key: const Key('dark_theme_switch'),
+                                  title: const Text('Dark theme'),
+                                  subtitle: const Text(
+                                    'Dark is default. Turn off to use light theme.',
                                   ),
-                                );
-                              }
-                            },
+                                  value: themeController.isDarkMode,
+                                  onChanged: themeController.setDarkMode,
+                                ),
+                                SwitchListTile(
+                                  key: const Key('default_room_listening_switch'),
+                                  title: const Text('Default room listening'),
+                                  subtitle: const Text(
+                                    'When you join a room, start with listening in background turned on.',
+                                  ),
+                                  value: defaultRoomListeningController.enabled,
+                                  onChanged:
+                                      defaultRoomListeningController.setEnabled,
+                                ),
+                                SwitchListTile(
+                                  key: const Key('network_hide_from_network_switch'),
+                                  title: const Text('Hide me from network'),
+                                  subtitle: const Text(
+                                    'Do not show your profile in the network user list.',
+                                  ),
+                                  value: networkPrivacyController.hideFromNetwork,
+                                  onChanged: networkPrivacyController
+                                      .setHideFromNetwork,
+                                ),
+                                if (networkPrivacyController.hideFromNetwork)
+                                  SwitchListTile(
+                                    key: const Key(
+                                      'network_block_chat_by_id_switch',
+                                    ),
+                                    title: const Text('Block chat by network ID'),
+                                    subtitle: const Text(
+                                      'Prevent users from chatting to you using your network ID.',
+                                    ),
+                                    value: networkPrivacyController
+                                        .blockIdChatWhenHidden,
+                                    onChanged: networkPrivacyController
+                                        .setBlockIdChatWhenHidden,
+                                  ),
+                                SwitchListTile(
+                                  key: const Key('app_lock_switch'),
+                                  title: const Text('App lock'),
+                                  subtitle: const Text(
+                                    'Use biometric if available, otherwise fallback to device screen lock.',
+                                  ),
+                                  value: appLockController.enabled,
+                                  onChanged: (bool enabled) async {
+                                    final bool ok = await appLockController
+                                        .setEnabled(enabled);
+                                    if (!context.mounted) {
+                                      return;
+                                    }
+                                    if (!ok) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Authentication failed. App lock unchanged.',
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                          SafeArea(
+                            top: false,
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                              child: DefaultTextStyle(
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall!
+                                    .copyWith(color: Colors.grey.shade600),
+                                child: FutureBuilder<String>(
+                                  future: _appVersionLabel(),
+                                  builder: (
+                                    BuildContext context,
+                                    AsyncSnapshot<String> snapshot,
+                                  ) {
+                                    final String appVersion = snapshot.data ??
+                                        'loading...';
+                                    return Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          'Protocol v$chatProtocolVersion  |  App v$appVersion',
+                                          key: const Key('settings_version_footer'),
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                ),
+                              ),
+                            ),
                           ),
                         ],
                       ),

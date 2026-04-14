@@ -32,7 +32,6 @@ class LanChatController extends ChangeNotifier {
        _chatPort = chatPortOverride ?? roomChatPort,
        _discoveryPort = discoveryPortOverride ?? roomDiscoveryPort;
   static const int _historyPageSize = 25;
-  static const int _protocolVersion = 2;
   static const String _signalCryptoCapability = 'signal-e2ee-v1';
   static const String _prefKeyLocalUserId = 'secret_chat_local_user_id';
 
@@ -2105,7 +2104,7 @@ class LanChatController extends ChangeNotifier {
 
   Map<String, dynamic> _protocolHandshakeMetadata() {
     return <String, dynamic>{
-      'protocolVersion': _protocolVersion,
+      'protocolVersion': chatProtocolVersion,
       'cryptoCapabilities': _isDirectChatMode
           ? const <String>[_signalCryptoCapability]
           : const <String>[],

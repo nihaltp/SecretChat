@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Secret Chat Contributors
 
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:secret_chat/chat/chat_constants.dart';
 import 'package:secret_chat/screens/settings_screen.dart';
 import 'package:secret_chat/security/app_lock_controller.dart';
 import 'package:secret_chat/security/app_lock_service.dart';
@@ -16,11 +20,35 @@ class _FakeAppLockService implements AppLockService {
   Future<bool> authenticate({required String reason}) async => true;
 }
 
+String _readPubspecVersion() {
+  final String pubspec = File('pubspec.yaml').readAsStringSync();
+  final RegExpMatch? match = RegExp(
+    r'^version:\s*([^\s]+)',
+    multiLine: true,
+  ).firstMatch(pubspec);
+  if (match == null) {
+    throw StateError('Could not find version in pubspec.yaml');
+  }
+  return match.group(1)!;
+}
+
 void main() {
   testWidgets('Settings toggle switches to light mode', (
     WidgetTester tester,
   ) async {
     SharedPreferences.setMockInitialValues(<String, Object>{});
+    final String expectedVersion = _readPubspecVersion();
+    final List<String> parts = expectedVersion.split('+');
+    final String appVersion = parts.first;
+    final String buildNumber = parts.length > 1 ? parts[1] : '0';
+    PackageInfo.setMockInitialValues(
+      appName: 'secret_chat',
+      packageName: 'com.nihaltp.secret_chat',
+      version: appVersion,
+      buildNumber: buildNumber,
+      buildSignature: '',
+      installerStore: null,
+    );
 
     final ThemeController controller = ThemeController();
     final AppLockController appLockController = AppLockController(
@@ -41,6 +69,7 @@ void main() {
         ),
       ),
     );
+    await tester.pumpAndSettle();
 
     expect(controller.themeMode, ThemeMode.dark);
     expect(find.text('Dark theme'), findsOneWidget);
@@ -65,6 +94,13 @@ void main() {
     await tester.pumpAndSettle();
     expect(
       find.byKey(const Key('network_block_chat_by_id_switch')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('settings_version_footer')), findsOneWidget);
+    expect(
+      find.text(
+        'Protocol v$chatProtocolVersion  |  App v$expectedVersion',
+      ),
       findsOneWidget,
     );
   });
