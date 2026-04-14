@@ -9,7 +9,9 @@ extension on LanChatController {
   /// For messages sent by the local user, tracks them in _localSentEntries
   /// for sender-owned history replay.
   void _appendChatFromPacket(Map<String, dynamic> packet) {
+    // Always strip padding and null bytes, regardless of sender's chunk size.
     String text = (packet['text'] ?? '').toString();
+    // Remove everything after the first null byte (padding separator)
     final int nullIndex = text.indexOf('\u0000');
     if (nullIndex != -1) {
       text = text.substring(0, nullIndex);

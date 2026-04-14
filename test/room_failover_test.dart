@@ -57,6 +57,9 @@ void main() {
         );
         expect(hosted, isTrue);
 
+        // Wait for host to be ready before joining
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+
         final RoomInfo room = RoomInfo(
           hostAddress: InternetAddress.loopbackIPv4,
           hostName: 'Host',

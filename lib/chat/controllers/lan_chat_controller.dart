@@ -34,6 +34,9 @@ class LanChatController extends ChangeNotifier {
        _localUserIdProvider = localUserIdProvider,
        _chatPort = chatPortOverride ?? roomChatPort,
        _discoveryPort = discoveryPortOverride ?? roomDiscoveryPort;
+
+  /// The port used for chat connections (for test and RoomInfo construction).
+  int get chatPort => _chatPort;
   static const int _historyPageSize = 25;
   static const String _signalCryptoCapability = 'signal-e2ee-v1';
   static const String _prefKeyLocalUserId = 'secret_chat_local_user_id';
