@@ -3,10 +3,10 @@
 
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-
 import 'package:secret_chat/chat/chat_constants.dart';
 import 'package:secret_chat/security/app_lock_controller.dart';
 import 'package:secret_chat/settings/default_room_listening_controller.dart';
+import 'package:secret_chat/settings/message_length_controller.dart';
 import 'package:secret_chat/settings/network_privacy_controller.dart';
 import 'package:secret_chat/settings/theme_controller.dart';
 import 'package:secret_chat/widgets/app_bottom_nav.dart';
@@ -19,6 +19,7 @@ class SettingsScreen extends StatelessWidget {
     required this.appLockController,
     required this.defaultRoomListeningController,
     required this.networkPrivacyController,
+    required this.messageLengthController,
     this.onOpenNetworkOverview,
     this.onOpenRooms,
     this.onOpenSettings,
@@ -28,6 +29,7 @@ class SettingsScreen extends StatelessWidget {
   final AppLockController appLockController;
   final DefaultRoomListeningController defaultRoomListeningController;
   final NetworkPrivacyController networkPrivacyController;
+  final MessageLengthController messageLengthController;
   final VoidCallback? onOpenNetworkOverview;
   final VoidCallback? onOpenRooms;
   final VoidCallback? onOpenSettings;
@@ -68,145 +70,222 @@ class SettingsScreen extends StatelessWidget {
                 return AnimatedBuilder(
                   animation: networkPrivacyController,
                   builder: (BuildContext context, _) {
-                    void openUsers() {
-                      Navigator.of(context).pop();
-                      onOpenNetworkOverview?.call();
-                    }
+                    return AnimatedBuilder(
+                      animation: messageLengthController,
+                      builder: (BuildContext context, _) {
+                        void openUsers() {
+                          Navigator.of(context).pop();
+                          onOpenNetworkOverview?.call();
+                        }
 
-                    void openRooms() {
-                      Navigator.of(context).pop();
-                      onOpenRooms?.call();
-                    }
+                        void openRooms() {
+                          Navigator.of(context).pop();
+                          onOpenRooms?.call();
+                        }
 
-                    void openSettings() {
-                      onOpenSettings?.call();
-                    }
+                        void openSettings() {
+                          onOpenSettings?.call();
+                        }
 
-                    return Scaffold(
-                      appBar: AppBar(
-                        automaticallyImplyLeading: false,
-                        title: const AppLogoTitle('Settings'),
-                      ),
-                      body: Column(
-                        children: [
-                          Expanded(
-                            child: ListView(
-                              padding: const EdgeInsets.all(16),
-                              children: [
-                                SwitchListTile(
-                                  key: const Key('dark_theme_switch'),
-                                  title: const Text('Dark theme'),
-                                  subtitle: const Text(
-                                    'Dark is default. Turn off to use light theme.',
-                                  ),
-                                  value: themeController.isDarkMode,
-                                  onChanged: themeController.setDarkMode,
-                                ),
-                                SwitchListTile(
-                                  key: const Key('default_room_listening_switch'),
-                                  title: const Text('Default room listening'),
-                                  subtitle: const Text(
-                                    'When you join a room, start with listening in background turned on.',
-                                  ),
-                                  value: defaultRoomListeningController.enabled,
-                                  onChanged:
-                                      defaultRoomListeningController.setEnabled,
-                                ),
-                                SwitchListTile(
-                                  key: const Key('network_hide_from_network_switch'),
-                                  title: const Text('Hide me from network'),
-                                  subtitle: const Text(
-                                    'Do not show your profile in the network user list.',
-                                  ),
-                                  value: networkPrivacyController.hideFromNetwork,
-                                  onChanged: networkPrivacyController
-                                      .setHideFromNetwork,
-                                ),
-                                if (networkPrivacyController.hideFromNetwork)
-                                  SwitchListTile(
-                                    key: const Key(
-                                      'network_block_chat_by_id_switch',
-                                    ),
-                                    title: const Text('Block chat by network ID'),
-                                    subtitle: const Text(
-                                      'Prevent users from chatting to you using your network ID.',
-                                    ),
-                                    value: networkPrivacyController
-                                        .blockIdChatWhenHidden,
-                                    onChanged: networkPrivacyController
-                                        .setBlockIdChatWhenHidden,
-                                  ),
-                                SwitchListTile(
-                                  key: const Key('app_lock_switch'),
-                                  title: const Text('App lock'),
-                                  subtitle: const Text(
-                                    'Use biometric if available, otherwise fallback to device screen lock.',
-                                  ),
-                                  value: appLockController.enabled,
-                                  onChanged: (bool enabled) async {
-                                    final bool ok = await appLockController
-                                        .setEnabled(enabled);
-                                    if (!context.mounted) {
-                                      return;
-                                    }
-                                    if (!ok) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                            'Authentication failed. App lock unchanged.',
-                                          ),
-                                        ),
-                                      );
-                                    }
-                                  },
-                                ),
-                              ],
-                            ),
+                        return Scaffold(
+                          appBar: AppBar(
+                            automaticallyImplyLeading: false,
+                            title: const AppLogoTitle('Settings'),
                           ),
-                          SafeArea(
-                            top: false,
-                            child: Padding(
-                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                              child: DefaultTextStyle(
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodySmall!
-                                    .copyWith(color: Colors.grey.shade600),
-                                child: FutureBuilder<({String appVersion, String channel})>(
-                                  future: _footerMetadata(),
-                                  builder: (
-                                    BuildContext context,
-                                    AsyncSnapshot<({String appVersion, String channel})> snapshot,
-                                  ) {
-                                    final String appVersion =
-                                        snapshot.data?.appVersion ?? 'loading...';
-                                    final String channel =
-                                        snapshot.data?.channel ?? 'loading...';
-                                    return Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Text(
-                                          'Protocol v$chatProtocolVersion  |  App v$appVersion  |  Channel $channel',
-                                          key: const Key('settings_version_footer'),
+                          body: Column(
+                            children: [
+                              Expanded(
+                                child: ListView(
+                                  padding: const EdgeInsets.all(16),
+                                  children: [
+                                    SwitchListTile(
+                                      key: const Key('dark_theme_switch'),
+                                      title: const Text('Dark theme'),
+                                      subtitle: const Text(
+                                        'Dark is default. Turn off to use light theme.',
+                                      ),
+                                      value: themeController.isDarkMode,
+                                      onChanged: themeController.setDarkMode,
+                                    ),
+                                    SwitchListTile(
+                                      key: const Key(
+                                        'default_room_listening_switch',
+                                      ),
+                                      title: const Text(
+                                        'Default room listening',
+                                      ),
+                                      subtitle: const Text(
+                                        'When you join a room, start with listening in background turned on.',
+                                      ),
+                                      value: defaultRoomListeningController
+                                          .enabled,
+                                      onChanged: defaultRoomListeningController
+                                          .setEnabled,
+                                    ),
+                                    SwitchListTile(
+                                      key: const Key(
+                                        'network_hide_from_network_switch',
+                                      ),
+                                      title: const Text('Hide me from network'),
+                                      subtitle: const Text(
+                                        'Do not show your profile in the network user list.',
+                                      ),
+                                      value: networkPrivacyController
+                                          .hideFromNetwork,
+                                      onChanged: networkPrivacyController
+                                          .setHideFromNetwork,
+                                    ),
+                                    if (networkPrivacyController
+                                        .hideFromNetwork)
+                                      SwitchListTile(
+                                        key: const Key(
+                                          'network_block_chat_by_id_switch',
                                         ),
-                                      ],
-                                    );
-                                  },
+                                        title: const Text(
+                                          'Block chat by network ID',
+                                        ),
+                                        subtitle: const Text(
+                                          'Prevent users from chatting to you using your network ID.',
+                                        ),
+                                        value: networkPrivacyController
+                                            .blockIdChatWhenHidden,
+                                        onChanged: networkPrivacyController
+                                            .setBlockIdChatWhenHidden,
+                                      ),
+                                    SwitchListTile(
+                                      key: const Key('app_lock_switch'),
+                                      title: const Text('App lock'),
+                                      subtitle: const Text(
+                                        'Use biometric if available, otherwise fallback to device screen lock.',
+                                      ),
+                                      value: appLockController.enabled,
+                                      onChanged: (bool enabled) async {
+                                        final bool ok = await appLockController
+                                            .setEnabled(enabled);
+                                        if (!context.mounted) {
+                                          return;
+                                        }
+                                        if (!ok) {
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                'Authentication failed. App lock unchanged.',
+                                              ),
+                                            ),
+                                          );
+                                        }
+                                      },
+                                    ),
+                                    const Divider(),
+                                    ListTile(
+                                      title: const Text('Padding limit'),
+                                      subtitle: Text(
+                                        'Mask message length. Currently padded up to ${messageLengthController.length} chars.',
+                                      ),
+                                      trailing: DropdownButton<int>(
+                                        value: messageLengthController.length,
+                                        underline: const SizedBox(),
+                                        items: const [
+                                          DropdownMenuItem(
+                                            value: 32,
+                                            child: Text('32'),
+                                          ),
+                                          DropdownMenuItem(
+                                            value: 64,
+                                            child: Text('64'),
+                                          ),
+                                          DropdownMenuItem(
+                                            value: 128,
+                                            child: Text('128'),
+                                          ),
+                                          DropdownMenuItem(
+                                            value: 256,
+                                            child: Text('256'),
+                                          ),
+                                          DropdownMenuItem(
+                                            value: 512,
+                                            child: Text('512'),
+                                          ),
+                                        ],
+                                        onChanged: (int? newValue) {
+                                          if (newValue != null) {
+                                            messageLengthController.setLength(
+                                              newValue,
+                                            );
+                                          }
+                                        },
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                            ),
+                              SafeArea(
+                                top: false,
+                                child: Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    16,
+                                    8,
+                                    16,
+                                    12,
+                                  ),
+                                  child: DefaultTextStyle(
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall!
+                                        .copyWith(color: Colors.grey.shade600),
+                                    child:
+                                        FutureBuilder<
+                                          ({String appVersion, String channel})
+                                        >(
+                                          future: _footerMetadata(),
+                                          builder:
+                                              (
+                                                BuildContext context,
+                                                AsyncSnapshot<
+                                                  ({
+                                                    String appVersion,
+                                                    String channel,
+                                                  })
+                                                >
+                                                snapshot,
+                                              ) {
+                                                final String appVersion =
+                                                    snapshot.data?.appVersion ??
+                                                    'loading...';
+                                                final String channel =
+                                                    snapshot.data?.channel ??
+                                                    'loading...';
+                                                return Row(
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment.center,
+                                                  children: [
+                                                    Text(
+                                                      'Protocol v$chatProtocolVersion  |  App v$appVersion  |  Channel $channel',
+                                                      key: const Key(
+                                                        'settings_version_footer',
+                                                      ),
+                                                    ),
+                                                  ],
+                                                );
+                                              },
+                                        ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                      bottomNavigationBar: AppBottomNav(
-                        activeItem: AppBottomNavItem.settings,
-                        onOpenUsers: onOpenNetworkOverview == null
-                            ? null
-                            : openUsers,
-                        onOpenRooms: onOpenRooms == null ? null : openRooms,
-                        onOpenSettings: openSettings,
-                      ),
+                          bottomNavigationBar: AppBottomNav(
+                            activeItem: AppBottomNavItem.settings,
+                            onOpenUsers: onOpenNetworkOverview == null
+                                ? null
+                                : openUsers,
+                            onOpenRooms: onOpenRooms == null ? null : openRooms,
+                            onOpenSettings: openSettings,
+                          ),
+                        );
+                      },
                     );
                   },
                 );

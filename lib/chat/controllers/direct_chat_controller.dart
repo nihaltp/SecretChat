@@ -11,9 +11,12 @@ import 'package:secret_chat/chat/controllers/lan_chat_controller.dart';
 /// to ensure messages are sent/received on userChatPort (48653) and discoveries on
 /// userDiscoveryPort (48652), avoiding conflicts with room-based chat traffic.
 class DirectChatController extends LanChatController {
-  DirectChatController({super.batteryLevelProvider, super.localUserIdProvider})
-    : super(
-        chatPortOverride: userChatPort,
-        discoveryPortOverride: userDiscoveryPort,
-      );
+  DirectChatController({
+    super.batteryLevelProvider,
+    super.localUserIdProvider,
+    super.messageLengthController,
+  }) : super(
+         chatPortOverride: userChatPort,
+         discoveryPortOverride: userDiscoveryPort,
+       );
 }

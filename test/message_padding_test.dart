@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:secret_chat/chat/chat_constants.dart';
 import 'package:secret_chat/chat/controllers/lan_chat_controller.dart';
 import 'package:secret_chat/chat/models/chat_message.dart';
+import 'package:secret_chat/settings/message_length_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -50,6 +51,44 @@ void main() {
 
     // Ensure the message has no null-byte artifacts left
     expect(secondChunk.text.contains('\u0000'), isFalse);
+
+    await controller.disconnect();
+    controller.dispose();
+  });
+
+  test('custom padding limit dynamically alters message chunking', () async {
+    final MessageLengthController paddingController = MessageLengthController();
+    await paddingController.setLength(32);
+
+    final LanChatController controller = LanChatController(
+      chatPortOverride: 0,
+      discoveryPortOverride: 0,
+      messageLengthController: paddingController,
+    );
+
+    final bool hosted = await controller.hostRoom(
+      yourName: 'Bob',
+      room: 'Test Custom Padding',
+    );
+    expect(hosted, isTrue);
+
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+    controller.messages.clear();
+
+    const int chunkLimit = 32;
+    const int extraLength = 10;
+    final String longMessage = 'B' * (chunkLimit * 2 + extraLength);
+
+    await controller.sendMessage(longMessage);
+
+    // With a limit of 32 and size of 74, we expect 3 chunks.
+    expect(controller.messages.length, 3);
+
+    expect(controller.messages[0].text.length, chunkLimit);
+    expect(controller.messages[1].text.length, chunkLimit);
+    expect(controller.messages[2].text.length, extraLength);
+
+    expect(controller.messages[2].text.contains('\u0000'), isFalse);
 
     await controller.disconnect();
     controller.dispose();

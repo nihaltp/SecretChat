@@ -14,6 +14,7 @@ import 'package:secret_chat/chat/controllers/failover_weights.dart';
 import 'package:secret_chat/chat/models/chat_message.dart';
 import 'package:secret_chat/chat/models/room_info.dart';
 import 'package:secret_chat/security/signal_encryption_service.dart';
+import 'package:secret_chat/settings/message_length_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 part 'lan_chat_controller_history_sync.dart';
@@ -28,6 +29,7 @@ class LanChatController extends ChangeNotifier {
     Future<String> Function()? localUserIdProvider,
     int? chatPortOverride,
     int? discoveryPortOverride,
+    this.messageLengthController,
   }) : _batteryLevelProvider = batteryLevelProvider ?? _defaultBatteryLevel,
        _localUserIdProvider = localUserIdProvider,
        _chatPort = chatPortOverride ?? roomChatPort,
@@ -50,6 +52,7 @@ class LanChatController extends ChangeNotifier {
       <String, Completer<void>>{};
   final Future<int> Function() _batteryLevelProvider;
   final Future<String> Function()? _localUserIdProvider;
+  final MessageLengthController? messageLengthController;
   final int _chatPort;
   final int _discoveryPort;
   final SignalEncryptionService _signalEncryptionService =

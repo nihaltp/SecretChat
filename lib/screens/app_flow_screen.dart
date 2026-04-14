@@ -22,6 +22,7 @@ import 'package:secret_chat/screens/rooms_screen.dart';
 import 'package:secret_chat/screens/settings_screen.dart';
 import 'package:secret_chat/security/app_lock_controller.dart';
 import 'package:secret_chat/settings/default_room_listening_controller.dart';
+import 'package:secret_chat/settings/message_length_controller.dart';
 import 'package:secret_chat/settings/network_privacy_controller.dart';
 import 'package:secret_chat/settings/theme_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -33,6 +34,7 @@ class AppFlowScreen extends StatefulWidget {
     required this.appLockController,
     required this.defaultRoomListeningController,
     required this.networkPrivacyController,
+    required this.messageLengthController,
     this.hotspotService = const MethodChannelHotspotService(),
   });
 
@@ -40,6 +42,7 @@ class AppFlowScreen extends StatefulWidget {
   final AppLockController appLockController;
   final DefaultRoomListeningController defaultRoomListeningController;
   final NetworkPrivacyController networkPrivacyController;
+  final MessageLengthController messageLengthController;
   final HotspotService hotspotService;
 
   @override
@@ -50,7 +53,9 @@ class _AppFlowScreenState extends State<AppFlowScreen>
     with WidgetsBindingObserver {
   static const String _prefKeyDisplayName = 'user_display_name';
 
-  final LanChatController _discoveryController = LanChatController();
+  late final LanChatController _discoveryController = LanChatController(
+    messageLengthController: widget.messageLengthController,
+  );
   final Map<String, LanChatController> _roomControllersByKey =
       <String, LanChatController>{};
   final Map<String, VoidCallback> _roomListenerByKey = <String, VoidCallback>{};
@@ -553,6 +558,7 @@ class _AppFlowScreenState extends State<AppFlowScreen>
           appLockController: widget.appLockController,
           defaultRoomListeningController: widget.defaultRoomListeningController,
           networkPrivacyController: widget.networkPrivacyController,
+          messageLengthController: widget.messageLengthController,
           onOpenNetworkOverview: canOpenUserOrRooms
               ? _openNetworkOverviewFromBottomNav
               : null,
@@ -706,7 +712,9 @@ class _AppFlowScreenState extends State<AppFlowScreen>
     }
 
     // Fallback: host a hidden direct room so chat can start immediately.
-    final DirectChatController roomController = DirectChatController();
+    final DirectChatController roomController = DirectChatController(
+      messageLengthController: widget.messageLengthController,
+    );
     final bool hosted = await roomController.hostRoom(
       yourName: _userName,
       room: intendedRoomName,
@@ -765,7 +773,9 @@ class _AppFlowScreenState extends State<AppFlowScreen>
       return;
     }
 
-    final LanChatController roomController = LanChatController();
+    final LanChatController roomController = LanChatController(
+      messageLengthController: widget.messageLengthController,
+    );
 
     final bool hosted = await roomController.hostRoom(
       yourName: _userName,
@@ -820,8 +830,12 @@ class _AppFlowScreenState extends State<AppFlowScreen>
 
     final bool isDirectChat = _isDirectRoomName(room.roomName);
     final LanChatController roomController = isDirectChat
-        ? DirectChatController()
-        : LanChatController();
+        ? DirectChatController(
+            messageLengthController: widget.messageLengthController,
+          )
+        : LanChatController(
+            messageLengthController: widget.messageLengthController,
+          );
 
     final bool joined = await roomController.joinRoom(
       room: room,

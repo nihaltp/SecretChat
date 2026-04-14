@@ -11,6 +11,7 @@ import 'package:secret_chat/screens/settings_screen.dart';
 import 'package:secret_chat/security/app_lock_controller.dart';
 import 'package:secret_chat/security/app_lock_service.dart';
 import 'package:secret_chat/settings/default_room_listening_controller.dart';
+import 'package:secret_chat/settings/message_length_controller.dart';
 import 'package:secret_chat/settings/network_privacy_controller.dart';
 import 'package:secret_chat/settings/theme_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -58,6 +59,8 @@ void main() {
         DefaultRoomListeningController();
     final NetworkPrivacyController networkPrivacyController =
         NetworkPrivacyController();
+    final MessageLengthController messageLengthController =
+        MessageLengthController();
 
     await tester.pumpWidget(
       MaterialApp(
@@ -66,6 +69,7 @@ void main() {
           appLockController: appLockController,
           defaultRoomListeningController: defaultRoomListeningController,
           networkPrivacyController: networkPrivacyController,
+          messageLengthController: messageLengthController,
         ),
       ),
     );

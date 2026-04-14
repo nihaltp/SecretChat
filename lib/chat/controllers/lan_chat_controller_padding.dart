@@ -18,10 +18,11 @@ extension on LanChatController {
   }
 
   List<String> _chunkAndPadMessage(String text) {
+    final int limit = messageLengthController?.length ?? messageLengthLimit;
     final List<String> parts = <String>[];
     int start = 0;
     while (start < text.length) {
-      int end = start + messageLengthLimit;
+      int end = start + limit;
       if (end > text.length) {
         end = text.length;
       }
@@ -32,9 +33,9 @@ extension on LanChatController {
     final List<String> result = <String>[];
     for (final String part in parts) {
       String paddedPart = part;
-      if (paddedPart.length < messageLengthLimit) {
+      if (paddedPart.length < limit) {
         paddedPart +=
-            '\u0000${_generateJunkText(messageLengthLimit - paddedPart.length - 1)}';
+            '\u0000${_generateJunkText(limit - paddedPart.length - 1)}';
       }
       result.add(paddedPart);
     }

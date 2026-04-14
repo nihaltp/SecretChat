@@ -2,10 +2,10 @@
 // Copyright (c) 2026 Secret Chat Contributors
 
 import 'package:flutter/material.dart';
-
 import 'package:secret_chat/screens/app_flow_screen.dart';
 import 'package:secret_chat/security/app_lock_controller.dart';
 import 'package:secret_chat/settings/default_room_listening_controller.dart';
+import 'package:secret_chat/settings/message_length_controller.dart';
 import 'package:secret_chat/settings/network_privacy_controller.dart';
 import 'package:secret_chat/settings/theme_controller.dart';
 
@@ -27,6 +27,8 @@ class _SecretChatAppState extends State<SecretChatApp> {
       DefaultRoomListeningController();
   final NetworkPrivacyController _networkPrivacyController =
       NetworkPrivacyController();
+  final MessageLengthController _messageLengthController =
+      MessageLengthController();
 
   @override
   void initState() {
@@ -38,6 +40,7 @@ class _SecretChatAppState extends State<SecretChatApp> {
   void dispose() {
     _defaultRoomListeningController.dispose();
     _networkPrivacyController.dispose();
+    _messageLengthController.dispose();
     _appLockController.dispose();
     _themeController.dispose();
     super.dispose();
@@ -69,6 +72,7 @@ class _SecretChatAppState extends State<SecretChatApp> {
             appLockController: _appLockController,
             defaultRoomListeningController: _defaultRoomListeningController,
             networkPrivacyController: _networkPrivacyController,
+            messageLengthController: _messageLengthController,
           ),
         );
       },
