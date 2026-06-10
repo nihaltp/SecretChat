@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+---
+
+## [2.0.0] - 2026-06-11
+
+### Maintenance
+
+- cabb851  chore: add fastlane
+
+### Other
+
+- 89d8b9a  change app name to secretchat
 
 ## v1.2.1 - 2026-04-15
 
