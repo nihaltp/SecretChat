@@ -2,12 +2,12 @@
 // Copyright (c) 2026 Secret Chat Contributors
 
 import 'package:flutter/material.dart';
-import 'package:secret_chat/screens/app_flow_screen.dart';
-import 'package:secret_chat/security/app_lock_controller.dart';
-import 'package:secret_chat/settings/default_room_listening_controller.dart';
-import 'package:secret_chat/settings/message_length_controller.dart';
-import 'package:secret_chat/settings/network_privacy_controller.dart';
-import 'package:secret_chat/settings/theme_controller.dart';
+import 'package:secretchat/screens/app_flow_screen.dart';
+import 'package:secretchat/security/app_lock_controller.dart';
+import 'package:secretchat/settings/default_room_listening_controller.dart';
+import 'package:secretchat/settings/message_length_controller.dart';
+import 'package:secretchat/settings/network_privacy_controller.dart';
+import 'package:secretchat/settings/theme_controller.dart';
 
 void main() {
   runApp(const SecretChatApp());

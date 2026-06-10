@@ -3,8 +3,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:secret_chat/chat/models/room_creation_data.dart';
-import 'package:secret_chat/screens/create_room_screen.dart';
+import 'package:secretchat/chat/models/room_creation_data.dart';
+import 'package:secretchat/screens/create_room_screen.dart';
 
 class _CreateRoomHarness extends StatefulWidget {
   const _CreateRoomHarness();

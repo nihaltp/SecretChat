@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Secret Chat Contributors
 
 import 'package:flutter/material.dart';
-import 'package:secret_chat/security/app_lock_service.dart';
+import 'package:secretchat/security/app_lock_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AppLockController extends ChangeNotifier {

@@ -1,9 +1,9 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:secret_chat/chat/controllers/lan_chat_controller.dart';
-import 'package:secret_chat/chat/models/room_info.dart';
-import 'package:secret_chat/settings/message_length_controller.dart';
+import 'package:secretchat/chat/controllers/lan_chat_controller.dart';
+import 'package:secretchat/chat/models/room_info.dart';
+import 'package:secretchat/settings/message_length_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 Future<void> _settle([int milliseconds = 300]) async {

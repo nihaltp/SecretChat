@@ -10,7 +10,7 @@ abstract class HotspotService {
 
 class MethodChannelHotspotService implements HotspotService {
   const MethodChannelHotspotService({MethodChannel? channel})
-    : _channel = channel ?? const MethodChannel('secret_chat/hotspot');
+    : _channel = channel ?? const MethodChannel('secretchat/hotspot');
 
   final MethodChannel _channel;
 

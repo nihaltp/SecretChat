@@ -3,7 +3,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:secret_chat/main.dart';
+import 'package:secretchat/main.dart';
 
 void main() {
   testWidgets('App defaults to dark theme mode', (WidgetTester tester) async {

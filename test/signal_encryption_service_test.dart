@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:secret_chat/security/signal_encryption_service.dart';
+import 'package:secretchat/security/signal_encryption_service.dart';
 
 void main() {
   group('SignalEncryptionService', () {

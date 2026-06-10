@@ -3,11 +3,11 @@
 
 import 'package:flutter/material.dart';
 
-import 'package:secret_chat/chat/models/network_user_info.dart';
-import 'package:secret_chat/chat/models/room_info.dart';
-import 'package:secret_chat/screens/models/active_room_item.dart';
-import 'package:secret_chat/widgets/app_bottom_nav.dart';
-import 'package:secret_chat/widgets/app_logo_title.dart';
+import 'package:secretchat/chat/models/network_user_info.dart';
+import 'package:secretchat/chat/models/room_info.dart';
+import 'package:secretchat/screens/models/active_room_item.dart';
+import 'package:secretchat/widgets/app_bottom_nav.dart';
+import 'package:secretchat/widgets/app_logo_title.dart';
 
 class NetworkOverviewScreen extends StatelessWidget {
   const NetworkOverviewScreen({

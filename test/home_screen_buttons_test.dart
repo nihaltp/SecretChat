@@ -3,7 +3,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:secret_chat/screens/home_screen.dart';
+import 'package:secretchat/screens/home_screen.dart';
 
 void main() {
   testWidgets('Home screen host and wifi buttons trigger callbacks', (

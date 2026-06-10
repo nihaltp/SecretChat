@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Secret Chat Contributors
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:secret_chat/chat/controllers/failover_weights.dart';
+import 'package:secretchat/chat/controllers/failover_weights.dart';
 
 void main() {
   test('lower latency improves host score when battery is equal', () {

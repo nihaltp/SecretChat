@@ -4,8 +4,8 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:secret_chat/chat/chat_constants.dart';
-import 'package:secret_chat/chat/models/room_info.dart';
+import 'package:secretchat/chat/chat_constants.dart';
+import 'package:secretchat/chat/models/room_info.dart';
 
 void main() {
   test('Direct user chat port is distinct from room and discovery ports', () {

@@ -75,8 +75,8 @@ Typical usage flow:
 
 ```bash
 # Clone the repository
-git clone https://github.com/nihaltp/secret_chat.git
-cd secret_chat
+git clone https://github.com/nihaltp/secretchat.git
+cd secretchat
 
 # Install dependencies
 flutter pub get

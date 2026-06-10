@@ -5,8 +5,8 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:secret_chat/chat/controllers/lan_chat_controller.dart';
-import 'package:secret_chat/chat/models/room_info.dart';
+import 'package:secretchat/chat/controllers/lan_chat_controller.dart';
+import 'package:secretchat/chat/models/room_info.dart';
 
 Future<void> _waitFor(
   bool Function() predicate, {

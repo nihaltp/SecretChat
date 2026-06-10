@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Secret Chat Contributors
 
 import 'package:flutter/material.dart';
-import 'package:secret_chat/chat/chat_constants.dart';
+import 'package:secretchat/chat/chat_constants.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class MessageLengthController extends ChangeNotifier {
@@ -10,7 +10,7 @@ class MessageLengthController extends ChangeNotifier {
     _load();
   }
 
-  static const String _prefKey = 'secret_chat_message_length_limit';
+  static const String _prefKey = 'secretchat_message_length_limit';
   static const int defaultLength = messageLengthLimit;
 
   int _length = defaultLength;

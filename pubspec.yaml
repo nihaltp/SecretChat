@@ -1,4 +1,4 @@
-name: secret_chat
+name: secretchat
 description: "A Secret Chat app that let's you chat with your friends in the same LAN without internet connection. wipes the chat history when the app is closed. restores the chat history when the app is opened again."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.

@@ -4,9 +4,9 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:secret_chat/chat/chat_constants.dart';
-import 'package:secret_chat/chat/controllers/lan_chat_controller.dart';
-import 'package:secret_chat/chat/models/room_info.dart';
+import 'package:secretchat/chat/chat_constants.dart';
+import 'package:secretchat/chat/controllers/lan_chat_controller.dart';
+import 'package:secretchat/chat/models/room_info.dart';
 
 Future<void> _settle([int milliseconds = 300]) async {
   await Future<void>.delayed(Duration(milliseconds: milliseconds));

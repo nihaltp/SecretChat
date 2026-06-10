@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:secret_chat/chat/controllers/lan_chat_controller.dart';
+import 'package:secretchat/chat/controllers/lan_chat_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -31,7 +31,7 @@ void main() {
       
       // Verify preferences wrote the correct ID
       final SharedPreferences prefs = await SharedPreferences.getInstance();
-      expect(prefs.getString('secret_chat_local_user_id'), firstId);
+      expect(prefs.getString('secretchat_local_user_id'), firstId);
     });
 
     test('updatePresenceAnnouncement called concurrently does not orphan timers', () async {

@@ -6,7 +6,7 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:cryptography/cryptography.dart';
-import 'package:secret_chat/chat/chat_constants.dart';
+import 'package:secretchat/chat/chat_constants.dart';
 
 class SignalPreKeyBundle {
   SignalPreKeyBundle({

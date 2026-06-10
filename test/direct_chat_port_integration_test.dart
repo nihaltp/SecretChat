@@ -3,9 +3,9 @@
 
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:secret_chat/chat/chat_constants.dart';
-import 'package:secret_chat/chat/controllers/direct_chat_controller.dart';
-import 'package:secret_chat/chat/controllers/lan_chat_controller.dart';
+import 'package:secretchat/chat/chat_constants.dart';
+import 'package:secretchat/chat/controllers/direct_chat_controller.dart';
+import 'package:secretchat/chat/controllers/lan_chat_controller.dart';
 
 void main() {
   group('Direct Chat Port Integration', () {

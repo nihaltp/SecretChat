@@ -9,12 +9,12 @@ import 'dart:math';
 import 'package:battery_plus/battery_plus.dart';
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter/material.dart';
-import 'package:secret_chat/chat/chat_constants.dart';
-import 'package:secret_chat/chat/controllers/failover_weights.dart';
-import 'package:secret_chat/chat/models/chat_message.dart';
-import 'package:secret_chat/chat/models/room_info.dart';
-import 'package:secret_chat/security/signal_encryption_service.dart';
-import 'package:secret_chat/settings/message_length_controller.dart';
+import 'package:secretchat/chat/chat_constants.dart';
+import 'package:secretchat/chat/controllers/failover_weights.dart';
+import 'package:secretchat/chat/models/chat_message.dart';
+import 'package:secretchat/chat/models/room_info.dart';
+import 'package:secretchat/security/signal_encryption_service.dart';
+import 'package:secretchat/settings/message_length_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 part 'lan_chat_controller_history_sync.dart';
@@ -35,11 +35,79 @@ class LanChatController extends ChangeNotifier {
        _chatPort = chatPortOverride ?? roomChatPort,
        _discoveryPort = discoveryPortOverride ?? roomDiscoveryPort;
 
+  /// Called when a message is received and should be acknowledged as delivered.
+  void acknowledgeMessageReceived(String messageId) {
+    if (localUserId == null || messageId.isEmpty) return;
+    final DateTime timestamp = DateTime.now();
+    final ChatMessage? msg = messages.cast<ChatMessage?>().firstWhere(
+      (m) => m != null && m.id == messageId,
+      orElse: () => null,
+    );
+    if (msg != null && msg.deliveredTo.containsKey(localUserId)) {
+      return;
+    }
+    if (mode == ChatMode.hosting) {
+      if (msg != null) {
+        msg.deliveredTo[localUserId!] = timestamp;
+      }
+      _broadcast(<String, dynamic>{
+        'type': 'messageReceived',
+        'messageId': messageId,
+        'userId': localUserId,
+        'timestamp': timestamp.toIso8601String(),
+      });
+      _notify();
+      return;
+    }
+    if (_serverConnection != null) {
+      _sendLine(_serverConnection!, {
+        'type': 'messageReceived',
+        'messageId': messageId,
+        'userId': localUserId,
+        'timestamp': timestamp.toIso8601String(),
+      });
+    }
+  }
+
+  /// Called when a message is seen and should be acknowledged as read.
+  void acknowledgeMessageSeen(String messageId) {
+    if (localUserId == null || messageId.isEmpty) return;
+    final DateTime timestamp = DateTime.now();
+    final ChatMessage? msg = messages.cast<ChatMessage?>().firstWhere(
+      (m) => m != null && m.id == messageId,
+      orElse: () => null,
+    );
+    if (msg != null && msg.readBy.containsKey(localUserId)) {
+      return;
+    }
+    if (mode == ChatMode.hosting) {
+      if (msg != null) {
+        msg.readBy[localUserId!] = timestamp;
+      }
+      _broadcast(<String, dynamic>{
+        'type': 'messageSeen',
+        'messageId': messageId,
+        'userId': localUserId,
+        'timestamp': timestamp.toIso8601String(),
+      });
+      _notify();
+      return;
+    }
+    if (_serverConnection != null) {
+      _sendLine(_serverConnection!, {
+        'type': 'messageSeen',
+        'messageId': messageId,
+        'userId': localUserId,
+        'timestamp': timestamp.toIso8601String(),
+      });
+    }
+  }
+
   /// The port used for chat connections (for test and RoomInfo construction).
   int get chatPort => _chatPort;
   static const int _historyPageSize = 25;
   static const String _signalCryptoCapability = 'signal-e2ee-v1';
-  static const String _prefKeyLocalUserId = 'secret_chat_local_user_id';
+  static const String _prefKeyLocalUserId = 'secretchat_local_user_id';
 
   final List<ChatMessage> messages = <ChatMessage>[];
   final List<String> participants = <String>[];
@@ -173,6 +241,10 @@ class LanChatController extends ChangeNotifier {
 
   List<RoomInfo> get visibleRooms {
     return discoveredRooms.where((RoomInfo room) => !room.hidden).toList();
+  }
+
+  List<String> get participantUserIds {
+    return _participantsById.keys.toList(growable: false);
   }
 
   void setStatus(String value) {
@@ -908,6 +980,35 @@ class LanChatController extends ChangeNotifier {
       }
 
       final String type = (decoded['type'] ?? '').toString();
+
+      // Handle message delivery/read receipts
+      if (type == 'messageReceived' || type == 'messageSeen') {
+        final String messageId = (decoded['messageId'] ?? '').toString();
+        final String userId = (peer.userId ?? decoded['userId'] ?? '')
+            .toString();
+        final DateTime ts =
+            DateTime.tryParse((decoded['timestamp'] ?? '').toString()) ??
+            DateTime.now();
+        final ChatMessage? msg = messages.cast<ChatMessage?>().firstWhere(
+          (m) => m != null && m.id == messageId,
+          orElse: () => null,
+        );
+        if (msg != null) {
+          if (type == 'messageReceived') {
+            msg.deliveredTo[userId] = ts;
+          } else if (type == 'messageSeen') {
+            msg.readBy[userId] = ts;
+          }
+          notifyListeners();
+        }
+        _broadcast(<String, dynamic>{
+          'type': type,
+          'messageId': messageId,
+          'userId': userId,
+          'timestamp': ts.toIso8601String(),
+        });
+        return;
+      }
       if (type == 'join') {
         if (_hostSecurityType != RoomSecurityType.none) {
           final String provided = (decoded['securityValue'] ?? '')
@@ -1215,6 +1316,28 @@ class LanChatController extends ChangeNotifier {
       }
 
       final String type = (decoded['type'] ?? '').toString();
+
+      // Caveman: handle message delivery/read receipts (direct chat)
+      if (type == 'messageReceived' || type == 'messageSeen') {
+        final String messageId = (decoded['messageId'] ?? '').toString();
+        final String userId = (decoded['userId'] ?? '').toString();
+        final DateTime ts =
+            DateTime.tryParse((decoded['timestamp'] ?? '').toString()) ??
+            DateTime.now();
+        final ChatMessage? msg = messages.cast<ChatMessage?>().firstWhere(
+          (m) => m != null && m.id == messageId,
+          orElse: () => null,
+        );
+        if (msg != null) {
+          if (type == 'messageReceived') {
+            msg.deliveredTo[userId] = ts;
+          } else if (type == 'messageSeen') {
+            msg.readBy[userId] = ts;
+          }
+          notifyListeners();
+        }
+        return;
+      }
       if (type == 'chat') {
         final String? resolvedText = await _resolveIncomingChatText(
           packet: decoded,

@@ -5,8 +5,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:secret_chat/chat/models/room_info.dart';
-import 'package:secret_chat/screens/rooms_screen.dart';
+import 'package:secretchat/chat/models/room_info.dart';
+import 'package:secretchat/screens/rooms_screen.dart';
 
 void main() {
   testWidgets('Rooms screen create/refresh/join buttons trigger callbacks', (

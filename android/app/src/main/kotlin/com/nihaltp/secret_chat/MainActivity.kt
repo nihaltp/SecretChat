@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Secret Chat Contributors
 
-package com.nihaltp.secret_chat
+package com.nihaltp.secretchat
 
 import android.content.ActivityNotFoundException
 import android.content.Intent
@@ -11,7 +11,7 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterFragmentActivity() {
-	private val hotspotChannel = "secret_chat/hotspot"
+	private val hotspotChannel = "secretchat/hotspot"
 
 	override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
 		super.configureFlutterEngine(flutterEngine)

@@ -3,10 +3,10 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:secret_chat/chat/models/network_user_info.dart';
-import 'package:secret_chat/chat/models/room_info.dart';
-import 'package:secret_chat/screens/models/active_room_item.dart';
-import 'package:secret_chat/screens/network_overview_screen.dart';
+import 'package:secretchat/chat/models/network_user_info.dart';
+import 'package:secretchat/chat/models/room_info.dart';
+import 'package:secretchat/screens/models/active_room_item.dart';
+import 'package:secretchat/screens/network_overview_screen.dart';
 
 void main() {
   testWidgets(

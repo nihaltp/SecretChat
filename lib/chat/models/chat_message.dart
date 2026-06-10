@@ -10,7 +10,10 @@ class ChatMessage {
     required this.timestamp,
     this.sequence,
     this.system = false,
-  });
+    Map<String, DateTime>? deliveredTo,
+    Map<String, DateTime>? readBy,
+  }) : deliveredTo = deliveredTo ?? {},
+       readBy = readBy ?? {};
 
   final String id;
   final String senderId;
@@ -19,4 +22,10 @@ class ChatMessage {
   final DateTime timestamp;
   final int? sequence;
   final bool system;
+
+  /// Map of userId to delivery timestamp (when the message was delivered to each user)
+  final Map<String, DateTime> deliveredTo;
+
+  /// Map of userId to read timestamp (when the message was read by each user)
+  final Map<String, DateTime> readBy;
 }

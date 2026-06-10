@@ -6,14 +6,14 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:secret_chat/chat/chat_constants.dart';
-import 'package:secret_chat/screens/settings_screen.dart';
-import 'package:secret_chat/security/app_lock_controller.dart';
-import 'package:secret_chat/security/app_lock_service.dart';
-import 'package:secret_chat/settings/default_room_listening_controller.dart';
-import 'package:secret_chat/settings/message_length_controller.dart';
-import 'package:secret_chat/settings/network_privacy_controller.dart';
-import 'package:secret_chat/settings/theme_controller.dart';
+import 'package:secretchat/chat/chat_constants.dart';
+import 'package:secretchat/screens/settings_screen.dart';
+import 'package:secretchat/security/app_lock_controller.dart';
+import 'package:secretchat/security/app_lock_service.dart';
+import 'package:secretchat/settings/default_room_listening_controller.dart';
+import 'package:secretchat/settings/message_length_controller.dart';
+import 'package:secretchat/settings/network_privacy_controller.dart';
+import 'package:secretchat/settings/theme_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class _FakeAppLockService implements AppLockService {
@@ -43,8 +43,8 @@ void main() {
     final String appVersion = parts.first;
     final String buildNumber = parts.length > 1 ? parts[1] : '0';
     PackageInfo.setMockInitialValues(
-      appName: 'secret_chat',
-      packageName: 'com.nihaltp.secret_chat',
+      appName: 'secretchat',
+      packageName: 'com.nihaltp.secretchat',
       version: appVersion,
       buildNumber: buildNumber,
       buildSignature: '',

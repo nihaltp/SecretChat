@@ -27,6 +27,20 @@ extension on LanChatController {
     final DateTime timestamp =
         DateTime.tryParse((packet['timestamp'] ?? '').toString()) ??
         DateTime.now();
+    // handle receipts
+    final Map<String, DateTime> deliveredTo = {};
+    final Map<String, DateTime> readBy = {};
+    if (packet['deliveredTo'] is Map) {
+      (packet['deliveredTo'] as Map).forEach((k, v) {
+        deliveredTo[k.toString()] =
+            DateTime.tryParse(v.toString()) ?? timestamp;
+      });
+    }
+    if (packet['readBy'] is Map) {
+      (packet['readBy'] as Map).forEach((k, v) {
+        readBy[k.toString()] = DateTime.tryParse(v.toString()) ?? timestamp;
+      });
+    }
     messages.add(
       ChatMessage(
         id: messageId,
@@ -37,9 +51,17 @@ extension on LanChatController {
         sequence: packet['sequence'] is int
             ? packet['sequence'] as int
             : int.tryParse((packet['sequence'] ?? '').toString()),
+        deliveredTo: deliveredTo,
+        readBy: readBy,
       ),
     );
+    // Auto-acknowledge delivery if not from self
     final String senderId = (packet['senderId'] ?? '').toString();
+    if (senderId != localUserId && messageId.isNotEmpty) {
+      acknowledgeMessageReceived(messageId);
+    }
+    // Optionally, auto-acknowledge seen if message is visible (e.g. in focus)
+    // This can be triggered from the UI when the message is actually shown.
     if (senderId == localUserId) {
       final int sequence = packet['sequence'] is int
           ? packet['sequence'] as int
