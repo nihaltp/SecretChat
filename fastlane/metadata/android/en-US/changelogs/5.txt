@@ -1,11 +1,16 @@
 v1.1.3 - Direct Chat and Discovery Reliability
-• Dedicated direct-chat ports: userDiscoveryPort (48652) and userChatPort (48653)
-• Room traffic kept isolated on roomDiscoveryPort/roomChatPort
-• Direct chat fallback: tapping a user starts a direct thread even if no peer direct room is currently visible
-• Network Overview improvements:
-	- Tap active rooms to jump back into chat
-	- Hide current user from discovered users list
-	- Removed discovered-rooms section for clearer UX
-• Improved LAN user presence broadcasting when not currently joined to a room
-• Fixed Android duplicate MainActivity declaration causing debug build failures
-• Hardened release.ps1 cache cleanup when build files are locked
+<ul>
+<li>Dedicated direct-chat ports: userDiscoveryPort (48652) and userChatPort (48653)</li>
+<li>Room traffic kept isolated on roomDiscoveryPort/roomChatPort</li>
+<li>Direct chat fallback: tapping a user starts a direct thread even if no peer direct room is currently visible</li>
+<li>Network Overview improvements:</li>
+<ul>
+<li>Tap active rooms to jump back into chat</li>
+<li>Hide current user from discovered users list</li>
+<li>Removed discovered-rooms section for clearer UX</li>
+</ul>
+<li>Improved LAN user presence broadcasting when not currently joined to a room</li>
+<li>Fixed Android duplicate MainActivity declaration causing debug build failures</li>
+<li>Hardened release.ps1 cache cleanup when build files are locked</li>
+</li>
+</ul>

@@ -1,5 +1,8 @@
 Secret Chat v2.0.0 (2026-06-11)
 
-Commits included in this release:
-- cabb851  chore: add fastlane
-- 89d8b9a  change app name to secretchat
+<h3>Commits included in this release</h3>
+<ul>
+<li>cabb851  chore: add fastlane</li>
+<li>89d8b9a  change app name to secretchat</li>
+</li>
+</ul>

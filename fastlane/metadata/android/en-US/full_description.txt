@@ -1,32 +1,44 @@
 Secret Chat is a local area network (LAN) messaging application that allows you to chat with friends and colleagues without an internet connection. Perfect for conferences, offices, events, or any situation where you need secure, private communication within a local network.
 
-Features:
-• No Internet Required - Chat over your local WiFi or mobile hotspot
-• Privacy Focused - Messages stay on your local network
-• Multiple Security Options - Protect your rooms with passwords, PINs, or pattern locks
-• Dark Theme - Easy on the eyes with built-in dark mode
-• App Lock - Biometric or screen lock protection for the entire app
-• Hidden Rooms - Create private rooms that don't appear in the room list
-• Message History - Messages persist while the app is running, cleared when closed
-• Material Design 3 - Modern, clean interface
+<h3>Features</h3>
+<ul>
+<li>No Internet Required - Chat over your local WiFi or mobile hotspot</li>
+<li>Privacy Focused - Messages stay on your local network</li>
+<li>Multiple Security Options - Protect your rooms with passwords, PINs, or pattern locks</li>
+<li>Dark Theme - Easy on the eyes with built-in dark mode</li>
+<li>App Lock - Biometric or screen lock protection for the entire app</li>
+<li>Hidden Rooms - Create private rooms that don't appear in the room list</li>
+<li>Message History - Messages persist while the app is running, cleared when closed</li>
+<li>Material Design 3 - Modern, clean interface</li>
+</li>
+</ul>
 
-How to Use:
-1. Choose "Host Network" to create a room and share as the host
-2. Or choose "Use Wi-Fi" to browse and join existing rooms
-3. Optionally protect your room with a password, PIN, or pattern
-4. Start chatting - all communication stays within your local network
+<h3>How to Use</h3>
+<ol>
+<li>Choose "Host Network" to create a room and share as the host</li>
+<li>Or choose "Use Wi-Fi" to browse and join existing rooms</li>
+<li>Optionally protect your room with a password, PIN, or pattern</li>
+<li>Start chatting - all communication stays within your local network</li>
+</li>
+</ol>
 
-Security:
-- All communication happens locally on your WiFi network
-- No data transmitted to external servers
-- Messages are not stored permanently
-- Supports biometric authentication
-- Pattern lock option for additional security
+<h3>Security</h3>
+<ul>
+<li>All communication happens locally on your WiFi network</li>
+<li>No data transmitted to external servers</li>
+<li>Messages are not stored permanently</li>
+<li>Supports biometric authentication</li>
+<li>Pattern lock option for additional security</li>
+</li>
+</ul>
 
-Perfect for:
-• Office communications and quick collaboration
-• Conferences and events
-• Classroom discussions
-• LAN parties and gaming events
-• Emergency communication when internet is unavailable
-• Privacy-conscious users who want local control
+<h3>Perfect for</h3>
+<ul>
+<li>Office communications and quick collaboration</li>
+<li>Conferences and events</li>
+<li>Classroom discussions</li>
+<li>LAN parties and gaming events</li>
+<li>Emergency communication when internet is unavailable</li>
+<li>Privacy-conscious users who want local control</li>
+</li>
+</ul>
