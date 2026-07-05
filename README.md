@@ -2,6 +2,24 @@
 
 A local area network (LAN) messaging application that allows you to chat with friends and colleagues without an internet connection.
 
+---
+
+## Download
+
+Available on my F-Droid repository:
+
+<img src="https://raw.githubusercontent.com/nihaltp/fdroid/main/repo/index.png" width="100" height="100" align="right" alt="F-Droid QR Code">
+
+**Repository URL:**
+
+```text
+https://nihaltp.github.io/fdroid/repo/
+```
+
+[Open Repo Page](https://nihaltp.github.io/fdroid/repo/) and scan the QR code.
+
+---
+
 ## 🌟 Features
 
 - **No Internet Required** - Chat over your local WiFi or mobile hotspot
